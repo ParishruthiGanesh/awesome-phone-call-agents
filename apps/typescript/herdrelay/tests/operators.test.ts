@@ -14,6 +14,7 @@ import {
   loadOperators,
   operatorIdFor,
   saveOperator,
+  seededOperator,
   verifyOperator,
 } from "../lib/operators";
 import type { Env } from "../lib/types";
@@ -127,4 +128,53 @@ test("a deployment with named accounts does not also accept the shared token", a
   assert.equal(viaAccount.ok, true);
   assert.equal(viaAccount.ok === true && viaAccount.operator.name, "Marta Nowak");
   assert.equal(viaAccount.ok === true && viaAccount.operator.shared, false);
+});
+
+// ---------------------------------------------------------------------------
+// The environment-defined account, for deployments with no shell access
+// ---------------------------------------------------------------------------
+
+const seedEnv = (seed: string) => ({ ...env, HERDRELAY_OPERATOR_SEED: seed }) as Env;
+
+test("a seeded account signs in by name, without touching the account file", async () => {
+  const withSeed = seedEnv("judge:Devpost Judge:open-sesame-2026");
+  const operator = await verifyOperator("judge", "open-sesame-2026", withSeed);
+  assert.equal(operator?.name, "Devpost Judge");
+  assert.equal(operator?.shared, false);
+  assert.deepEqual(await loadOperators(withSeed), []);
+});
+
+test("a seeded account refuses a wrong password, and an unknown username", async () => {
+  const withSeed = seedEnv("judge:Devpost Judge:open-sesame-2026");
+  assert.equal(await verifyOperator("judge", "open-sesame-2025", withSeed), null);
+  assert.equal(await verifyOperator("judge", "", withSeed), null);
+  assert.equal(await verifyOperator("someone", "open-sesame-2026", withSeed), null);
+});
+
+test("a malformed or too-weak seed defines no account at all", () => {
+  for (const bad of [
+    "",
+    "judge",
+    "judge:Devpost Judge",
+    "judge::open-sesame-2026",
+    ":Devpost Judge:open-sesame-2026",
+    "judge:Devpost Judge:short",
+    "Judge:Devpost Judge:open-sesame-2026",
+    "has space:Devpost Judge:open-sesame-2026",
+  ]) {
+    assert.equal(seededOperator(seedEnv(bad)), null, `seed ${JSON.stringify(bad)} was accepted`);
+  }
+});
+
+test("a password containing colons survives being parsed out of the seed", () => {
+  const seed = seededOperator(seedEnv("judge:Devpost Judge:a:b:c:12345"));
+  assert.equal(seed?.password, "a:b:c:12345");
+  assert.equal(seed?.name, "Devpost Judge");
+});
+
+test("a file account of the same name is not shadowed by a seed for other usernames", async () => {
+  await addMarta();
+  const withSeed = seedEnv("judge:Devpost Judge:open-sesame-2026");
+  assert.equal((await verifyOperator("marta", PASSWORD, withSeed))?.name, "Marta Nowak");
+  assert.equal((await verifyOperator("judge", "open-sesame-2026", withSeed))?.name, "Devpost Judge");
 });

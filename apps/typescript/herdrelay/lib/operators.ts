@@ -54,6 +54,35 @@ export type Operator = {
 
 export const SHARED_TOKEN_OPERATOR_NAME = "Unnamed operator (shared token)";
 
+/**
+ * An account defined entirely by an environment variable, as
+ * `username:Display Name:password`.
+ *
+ * It exists so a deployed instance can have a sign-in without anybody opening a
+ * shell on the server to run `operators:add` — `operators.json` is gitignored
+ * and never travels with the code. Nothing is written to disk, so it also works
+ * on a read-only filesystem.
+ *
+ * The trade-off is real and worth stating: this password sits in the
+ * deployment's environment in plaintext, where a file account stores only a
+ * hash. It is meant for a demonstration account whose password is published
+ * anyway, not for an operator whose approval means something.
+ */
+export function seededOperator(env: Env = process.env): { username: string; name: string; password: string } | null {
+  const raw = env.HERDRELAY_OPERATOR_SEED?.trim();
+  if (!raw) return null;
+  const firstColon = raw.indexOf(":");
+  const secondColon = raw.indexOf(":", firstColon + 1);
+  if (firstColon < 1 || secondColon < firstColon + 2) return null;
+
+  const username = raw.slice(0, firstColon).trim();
+  const name = raw.slice(firstColon + 1, secondColon).trim();
+  // Everything after the second colon, so a password may contain colons.
+  const password = raw.slice(secondColon + 1);
+  if (!isValidUsername(username) || !name || password.length < 8) return null;
+  return { username, name, password };
+}
+
 export function operatorsFile(env: Env = process.env): string {
   return env.HERDRELAY_OPERATORS_FILE?.trim() || path.join(process.cwd(), "operators.json");
 }
@@ -99,6 +128,14 @@ export async function verifyOperator(
   password: string,
   env: Env = process.env,
 ): Promise<Operator | null> {
+  const seed = seededOperator(env);
+  if (seed && seed.username === username) {
+    const provided = Buffer.from(password);
+    const expected = Buffer.from(seed.password);
+    if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
+    return { id: operatorIdFor(seed.username), name: seed.name, shared: false };
+  }
+
   const records = await loadOperators(env);
   const record = records.find((candidate) => candidate.username === username);
   if (!record) {

@@ -21,7 +21,13 @@
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { callMode } from "./mode";
-import { loadOperators, SHARED_TOKEN_OPERATOR_NAME, verifyOperator, type Operator } from "./operators";
+import {
+  loadOperators,
+  seededOperator,
+  SHARED_TOKEN_OPERATOR_NAME,
+  verifyOperator,
+  type Operator,
+} from "./operators";
 import type { Env } from "./types";
 
 export function secretMatches(actual: string, expected: string): boolean {
@@ -71,7 +77,9 @@ export async function accessDecision(
   env: Env = process.env,
 ): Promise<AccessDecision> {
   const live = callMode(env) === "live";
-  const accounts = await loadOperators(env);
+  const fileAccounts = await loadOperators(env);
+  const hasSeed = seededOperator(env) !== null;
+  const accounts = hasSeed ? [...fileAccounts, { username: "seed" }] : fileAccounts;
   const token = env.HERDRELAY_AUTH_TOKEN ?? "";
   const hasToken = token.length >= 32;
 

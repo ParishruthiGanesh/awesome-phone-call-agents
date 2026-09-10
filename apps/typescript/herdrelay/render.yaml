@@ -1,0 +1,57 @@
+# Render blueprint for HerdRelay.
+#
+# Every value here is the SAFE default: no-call mode, no caller-supplied
+# numbers, no credential. Turning on real calling is a deliberate act performed
+# in the Render dashboard, not something that ships in a file.
+#
+# The same build and start commands work on Railway, Fly.io, or any host that
+# runs Node 22 with a normal filesystem. HerdRelay writes incident state to
+# disk, so it needs a single always-on instance — serverless platforms with
+# per-invocation filesystems will lose incidents between requests.
+services:
+  - type: web
+    name: herdrelay
+    runtime: node
+    plan: free
+    rootDir: apps/typescript/herdrelay
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+
+      # No phone can ring until this is changed to `live` in the dashboard.
+      - key: HERDRELAY_MODE
+        value: dry_run
+
+      # Caller-supplied numbers are refused unless this is exactly `true`.
+      # Read the README's "Self-service demo mode" section before enabling it.
+      - key: HERDRELAY_SELF_SERVICE
+        value: "false"
+
+      - key: HERDRELAY_DAILY_CALL_CAP
+        value: "5"
+      - key: HERDRELAY_VISITOR_ATTEMPTS
+        value: "3"
+
+      - key: HERDRELAY_SITE_NAME
+        value: Ridgeline Dairy
+
+      # On the free plan the filesystem is not persistent, so incidents reset
+      # when the instance restarts. That is fine for a demo — there is a reset
+      # button anyway. Attach a disk and point this at its mount path if the
+      # records need to survive.
+      - key: HERDRELAY_DATA_DIR
+        value: ./data
+
+      # Set these in the dashboard, never in this file.
+      #   HERDRELAY_OPERATOR_SEED  judge:Devpost Judge:your-password
+      #   HERDRELAY_ORIGIN         https://<your-service>.onrender.com
+      #   CALLE_API_KEY            only if you turn HERDRELAY_MODE to live
+      - key: HERDRELAY_OPERATOR_SEED
+        sync: false
+      - key: HERDRELAY_ORIGIN
+        sync: false
+      - key: CALLE_API_KEY
+        sync: false

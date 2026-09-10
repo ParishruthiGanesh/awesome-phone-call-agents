@@ -133,8 +133,9 @@ apps/typescript/herdrelay/
 │   ├── self-service.ts          Consent, caps and per-number limits for a public demo
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
+├── render.yaml                  Deploy blueprint, safe defaults only
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       108 tests, no credentials, no calls
+├── tests/                       113 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -252,6 +253,7 @@ The dashboard runs in dry run with no configuration, no credentials, and no `.en
 | `HERDRELAY_AUTH_TOKEN` | fallback | Single shared login (`herdrelay` / this token), 32+ characters. Superseded by named accounts. |
 | `HERDRELAY_OPERATORS_FILE` | no | Where operator accounts live. Defaults to `./operators.json`, which is gitignored. |
 | `HERDRELAY_ORIGIN` | no | Exact browser origin. Unset uses the request's own `Host`, so any local port works. |
+| `HERDRELAY_OPERATOR_SEED` | no | One account as `username:Display Name:password`, for a host with no shell. Plaintext; demo accounts only. |
 | `HERDRELAY_SELF_SERVICE` | no | `true` lets the recipient supply and consent to their own number. Off otherwise. |
 | `HERDRELAY_DAILY_CALL_CAP` | no | Calls a day across the deployment in self-service mode. Default 5. |
 | `HERDRELAY_VISITOR_ATTEMPTS` | no | Attempts an hour per visitor in self-service mode. Default 3. |
@@ -277,6 +279,20 @@ salt, and is gitignored.
 
 Sign in with that username and password, and the approval, the timeline and the incident record all
 carry the name: *"Marta Nowak approved one simulated call to +1 ••••••••42."*
+
+On a deployed host there is usually no shell to run `operators:add` in, and `operators.json` is
+gitignored so it never travels with the code. For that case one account can be defined entirely by
+an environment variable:
+
+```
+HERDRELAY_OPERATOR_SEED=judge:Devpost Judge:your-password-here
+```
+
+That is username `judge`, shown as "Devpost Judge", with the password after the second colon
+(which may itself contain colons). Nothing is written to disk, so it works on a read-only
+filesystem. The trade-off is real: this password sits in the deployment's environment in plaintext,
+where a file account stores only a scrypt hash. Use it for a demonstration account whose password is
+published anyway, not for an operator whose approval means something.
 
 If no account exists, live mode falls back to `HERDRELAY_AUTH_TOKEN` — one shared password for the
 whole deployment. That still gates the call, but the approval can only name the deployment, so the
@@ -437,7 +453,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 108 tests
+npm test        # 113 tests
 npm run check   # typecheck + tests
 ```
 
@@ -455,8 +471,32 @@ about 1.5 seconds.
 
 ## Deployment
 
-Any Node host that runs Next.js and gives the process a writable directory works
-(`npm run build && npm start`). It is a single-operator tool, so:
+`render.yaml` is a ready blueprint for [Render](https://render.com), and its build and start commands
+work unchanged on Railway, Fly.io, or any host running Node 22 with a normal filesystem. Every value
+in it is the safe default: no-call mode, no caller-supplied numbers, no credential. Point Render at
+this repository, and it builds from `apps/typescript/herdrelay`.
+
+Then set in the dashboard, never in the file:
+
+| Variable | Value |
+| --- | --- |
+| `HERDRELAY_OPERATOR_SEED` | `judge:Devpost Judge:your-password` — the sign-in you publish |
+| `HERDRELAY_ORIGIN` | your exact `https://…` URL |
+
+That is a complete no-call demo: judges sign in, walk the whole workflow, and no phone can ring.
+
+To let a visitor have their own phone called, additionally set `HERDRELAY_MODE=live`,
+`HERDRELAY_SELF_SERVICE=true` and `CALLE_API_KEY`, and read the self-service section above first.
+Turn it off after judging.
+
+A note on hosts: HerdRelay keeps incident state as files, so it needs a single always-on instance.
+Serverless platforms with per-invocation filesystems — Vercel among them — will lose an incident
+between the request that created it and the request that polls it, and will not enforce the
+cross-process locks. On Render's free plan the filesystem resets when the instance restarts, which
+costs nothing here because the demo has a reset button; attach a disk and point `HERDRELAY_DATA_DIR`
+at it if records need to survive.
+
+It is a single-operator tool, so:
 
 - set `HERDRELAY_AUTH_TOKEN` and, behind a proxy or CDN, `HERDRELAY_ORIGIN` to your exact HTTPS
   origin;
@@ -636,7 +676,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 108, no credentials and no calls.
+Tests: 113, no credentials and no calls.
 ```
 
 ---
