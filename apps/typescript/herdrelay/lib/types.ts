@@ -171,6 +171,14 @@ export type CallMode = "dry_run" | "live";
 export type Approval = {
   approvedAt: string;
   operatorId: string;
+  /**
+   * The name of the person who approved, as they signed in. This is the whole
+   * reason named accounts exist: an approval is the record that a person
+   * authorized a call, so it has to be able to say which person.
+   */
+  operatorName: string;
+  /** True when approved with the shared token, so no person can be named. */
+  operatorShared: boolean;
   previewFingerprint: string;
   recipientMasked: string;
   mode: CallMode;

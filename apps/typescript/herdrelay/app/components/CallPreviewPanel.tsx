@@ -131,7 +131,8 @@ export function CallPreviewPanel({
         <Rail>Step 1 — approve this exact call</Rail>
         {approved ? (
           <p className="mt-2 text-sm text-green">
-            Approved for {incident.approval?.recipientMasked}. The approval expires at{" "}
+            Approved by <span className="font-semibold">{incident.approval?.operatorName}</span> for{" "}
+            {incident.approval?.recipientMasked}. The approval expires at{" "}
             <span className="numeric">{new Date(incident.approval!.expiresAt).toISOString().slice(11, 16)} UTC</span>.
           </p>
         ) : (

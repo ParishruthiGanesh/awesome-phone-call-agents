@@ -12,7 +12,7 @@ export const runtime = "nodejs";
  * person's phone rang, and a reset button is not a reason to lose it.
  */
 export async function POST(request: Request) {
-  const denied = requireOperator(request);
+  const { denied } = await requireOperator(request);
   if (denied) return denied;
   if (callMode() === "live") {
     return NextResponse.json(

@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Operator accounts: scrypt password hashes, one entry per named operator
+operators.json
+
 # Dependencies and build output
 node_modules/
 .next/

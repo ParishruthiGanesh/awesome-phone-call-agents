@@ -35,28 +35,33 @@ test("live readiness fails closed on every missing piece, and names none of the 
   assert.equal(liveReadiness(LIVE).ready, true);
 });
 
-test("live mode is never open, and dry run without a token still refuses cross-origin writes", () => {
+test("live mode is never open, and dry run without a credential still refuses cross-origin writes", async () => {
   const headers = (extra: Record<string, string> = {}) => new Headers(extra);
+  const decide = (init: { method: string; headers: Headers }, env: Env) => accessDecision(init, env);
 
-  const noToken = accessDecision({ method: "POST", headers: headers() }, { HERDRELAY_MODE: "live" } as Env);
-  assert.equal(noToken.ok, false);
-  assert.equal(noToken.ok === false && noToken.status, 503);
+  const noCredential = await decide({ method: "POST", headers: headers() }, { HERDRELAY_MODE: "live" } as Env);
+  assert.equal(noCredential.ok, false);
+  assert.equal(noCredential.ok === false && noCredential.status, 503);
+  assert.match(noCredential.ok === false ? noCredential.error : "", /operators:add/);
 
-  const unauthenticated = accessDecision({ method: "GET", headers: headers() }, LIVE);
+  const unauthenticated = await decide({ method: "GET", headers: headers() }, LIVE);
   assert.equal(unauthenticated.ok, false);
   assert.equal(unauthenticated.ok === false && unauthenticated.status, 401);
 
   const authorization = `Basic ${Buffer.from(`herdrelay:${"x".repeat(32)}`).toString("base64")}`;
-  assert.equal(accessDecision({ method: "GET", headers: headers({ authorization }) }, LIVE).ok, true);
+  const signedIn = await decide({ method: "GET", headers: headers({ authorization }) }, LIVE);
+  assert.equal(signedIn.ok, true);
+  // The shared token can act, but it cannot claim to be a person.
+  assert.equal(signedIn.ok === true && signedIn.operator.shared, true);
 
-  const crossSite = accessDecision(
+  const crossSite = await decide(
     { method: "POST", headers: headers({ authorization, "sec-fetch-site": "cross-site" }) },
     LIVE,
   );
   assert.equal(crossSite.ok, false);
   assert.equal(crossSite.ok === false && crossSite.status, 403);
 
-  const wrongOrigin = accessDecision(
+  const wrongOrigin = await decide(
     { method: "POST", headers: headers({ origin: "https://elsewhere.example", host: "localhost:3000" }) },
     {} as Env,
   );
@@ -65,30 +70,32 @@ test("live mode is never open, and dry run without a token still refuses cross-o
   // With no configured origin, the request's own Host is the comparison, so a
   // demo on any port works while a cross-site page still cannot post to it.
   assert.equal(
-    accessDecision(
+    (await decide(
       { method: "POST", headers: headers({ origin: "http://localhost:3123", host: "localhost:3123" }) },
       {} as Env,
-    ).ok,
+    )).ok,
     true,
   );
   assert.equal(
-    accessDecision(
+    (await decide(
       { method: "POST", headers: headers({ origin: "http://localhost:3123", host: "localhost:3000" }) },
       {} as Env,
-    ).ok,
+    )).ok,
     false,
   );
   // A configured origin is the only answer, whatever Host claims.
   assert.equal(
-    accessDecision(
+    (await decide(
       { method: "POST", headers: headers({ origin: "http://localhost:3123", host: "localhost:3123" }) },
       { HERDRELAY_ORIGIN: "https://herdrelay.example" } as Env,
-    ).ok,
+    )).ok,
     false,
   );
 
-  // Dry run with no token configured stays open, which is what makes the demo runnable.
-  assert.equal(accessDecision({ method: "POST", headers: headers() }, {} as Env).ok, true);
+  // Dry run with nothing configured stays open, which is what makes the demo runnable.
+  const open = await decide({ method: "POST", headers: headers() }, {} as Env);
+  assert.equal(open.ok, true);
+  assert.equal(open.ok === true && open.operator.shared, true);
 });
 
 test("the operator identity is derived from the token and never leaks it", () => {

@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { operatorId } from "../lib/access";
+import { anonymousOperator } from "../lib/access";
 import {
   APPROVAL_TTL_MS,
   approveIncident,
@@ -28,7 +28,7 @@ import type { Incident } from "../lib/types";
 import type { Env } from "../lib/types";
 
 const ALERT = "alert_c17_0412";
-const OPERATOR = operatorId({} as Env);
+const OPERATOR = { ...anonymousOperator({} as Env), name: "Marta Nowak" };
 
 before(async () => {
   process.env.HERDRELAY_DATA_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "herdrelay-test-"));
@@ -83,7 +83,7 @@ test("an approval carrying the wrong fingerprint is refused", async () => {
 
 test("an approval from another operator cannot be spent", async () => {
   const incident = await approvedIncident();
-  await assert.rejects(() => placeCall(incident.id, "someone-else"), /different operator/);
+  await assert.rejects(() => placeCall(incident.id, { id: "someone-else", name: "Sam Okonkwo", shared: false }), /Only they can place it/);
 });
 
 test("an expired approval will not dial", async () => {
@@ -118,6 +118,14 @@ test("the approved call runs to a validated result, and the record holds no phon
     finished.timeline.map((entry) => entry.step),
     ["alert_received", "call_prepared", "approved", "dialing", "call_connected", "call_ended", "result_validated"],
   );
+});
+
+test("the approval and the timeline record which person authorized the call", async () => {
+  const incident = await approvedIncident();
+  assert.equal(incident.approval?.operatorName, "Marta Nowak");
+  assert.equal(incident.approval?.operatorId, OPERATOR.id);
+  const approved = incident.timeline.find((entry) => entry.step === "approved");
+  assert.match(approved?.detail ?? "", /^Marta Nowak approved/);
 });
 
 test("placing the same approved call twice does not place a second call", async () => {

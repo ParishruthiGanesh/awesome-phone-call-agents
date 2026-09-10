@@ -12,6 +12,7 @@ import { Button, Notice, Panel, Pill, Rail, Stat } from "./ui";
 
 type ConsoleState = {
   mode: CallMode;
+  operator: { name: string; shared: boolean };
   liveReady: boolean;
   liveBlockedReason: string | null;
   dryRunScenario: string | null;
@@ -182,7 +183,13 @@ export function Console() {
             advice.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {state ? (
+            <div className="text-right">
+              <div className="rail">Signed in as</div>
+              <p className="mt-0.5 text-sm text-chalk">{state.operator.name}</p>
+            </div>
+          ) : null}
           {state && !live ? (
             <Button intent="quiet" onClick={reset} disabled={busy}>
               Reset demo
@@ -201,6 +208,17 @@ export function Console() {
         <div className="mt-5">
           <Notice tone="red" title="LIVE MODE IS NOT READY">
             {state.liveBlockedReason} Until this is resolved, no call can be placed.
+          </Notice>
+        </div>
+      ) : null}
+
+      {state?.operator.shared && live ? (
+        <div className="mt-5">
+          <Notice tone="amber" title="APPROVALS CANNOT NAME A PERSON">
+            This deployment signs in with one shared credential, so an approval records the
+            deployment rather than the person who made it. Create named accounts with{" "}
+            <span className="numeric">npm run operators:add</span> and the approval record, the
+            timeline and the audit trail will carry a real name.
           </Notice>
         </div>
       ) : null}

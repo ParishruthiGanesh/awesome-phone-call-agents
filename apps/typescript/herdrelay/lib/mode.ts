@@ -6,6 +6,7 @@
  * copied from a template, and a mode set by an unrelated process all resolve to
  * "do not dial".
  */
+import { configuredDestinationProblem } from "./phone";
 import type { CallMode, Env } from "./types";
 
 export const DRY_RUN_SCENARIOS = [
@@ -52,11 +53,9 @@ export function liveReadiness(env: Env = process.env): LiveReadiness {
   if (callMode(env) !== "live") {
     return { ready: false, reason: "HERDRELAY_MODE is not `live`; HerdRelay will not place calls." };
   }
-  if (!env.HERDRELAY_AUTHORIZED_E164) {
-    return {
-      ready: false,
-      reason: "No authorized caretaker number is configured. Set HERDRELAY_AUTHORIZED_E164.",
-    };
+  const destinationProblem = configuredDestinationProblem(env.HERDRELAY_AUTHORIZED_E164);
+  if (destinationProblem) {
+    return { ready: false, reason: destinationProblem };
   }
   if (!env.CALLE_API_KEY) {
     return { ready: false, reason: "CALLE_API_KEY is not set." };

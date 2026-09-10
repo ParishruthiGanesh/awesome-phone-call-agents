@@ -9,7 +9,7 @@ const Body = z.object({ callId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optio
 
 /** Resolve an incident whose create request never came back. Never dials. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(request);
+  const { denied } = await requireOperator(request);
   if (denied) return denied;
   const { id } = await context.params;
   const parsed = Body.safeParse(await request.json().catch(() => ({})));

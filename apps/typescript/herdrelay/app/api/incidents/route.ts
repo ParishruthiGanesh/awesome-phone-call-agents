@@ -9,7 +9,7 @@ const Body = z.object({ alertId: z.string().min(1).max(64), scenario: z.string()
 
 /** Prepare one incident from one alert. Prepares a call; places nothing. */
 export async function POST(request: Request) {
-  const denied = requireOperator(request);
+  const { denied } = await requireOperator(request);
   if (denied) return denied;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

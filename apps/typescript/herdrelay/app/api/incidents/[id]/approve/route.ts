@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { operatorId, requireOperator } from "@/lib/auth";
+import { requireOperator } from "@/lib/auth";
 import { approveIncident, workflowError } from "@/lib/incident";
 
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ const Body = z.object({ fingerprint: z.string().regex(/^[0-9a-f]{64}$/) }).stric
  * operator has not read.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(request);
+  const { denied, operator } = await requireOperator(request);
   if (denied) return denied;
   const { id } = await context.params;
   const parsed = Body.safeParse(await request.json().catch(() => null));
@@ -23,7 +23,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Approval must carry the fingerprint of the previewed call." }, { status: 400 });
   }
   try {
-    const { incident, preview } = await approveIncident(id, parsed.data.fingerprint, operatorId());
+    const { incident, preview } = await approveIncident(id, parsed.data.fingerprint, operator);
     return NextResponse.json({ incident, preview });
   } catch (error) {
     const { status, ...body } = workflowError(error);

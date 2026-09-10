@@ -125,14 +125,15 @@ apps/typescript/herdrelay/
 │   ├── dry-run.ts               Scripted no-call engine
 │   ├── incident.ts              The workflow: prepare, approve, place, poll, reconcile
 │   ├── mode.ts                  Dry run by default; live readiness
+│   ├── operators.ts             Named operator accounts, scrypt-hashed
 │   ├── phone.ts                 E.164, masking, reserved fictional range
 │   ├── preview.ts               The approved object and its fingerprint
 │   ├── redact.ts                Masking for logs and errors
 │   ├── result.ts                Structured-result validation, fail closed
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
-├── scripts/                     dry-run, preview-call, reset-demo
-├── tests/                       70 tests, no credentials, no calls
+├── scripts/                     dry-run, preview-call, reset-demo, operators
+├── tests/                       82 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -240,12 +241,38 @@ The dashboard runs in dry run with no configuration, no credentials, and no `.en
 | `HERDRELAY_SITE_NAME` | no | The farm named in the disclosure. Defaults to `Ridgeline Dairy`. |
 | `CALLE_API_KEY` | live only | CALL-E credential. Server-side only; sent only to `api.heycall-e.com`. |
 | `CALLE_BASE_URL` | no | Compatibility only; only `https://api.heycall-e.com` is accepted. |
-| `HERDRELAY_AUTH_TOKEN` | live only | Browser login (`herdrelay` / this token), 32+ random characters. |
+| `HERDRELAY_AUTH_TOKEN` | fallback | Single shared login (`herdrelay` / this token), 32+ characters. Superseded by named accounts. |
+| `HERDRELAY_OPERATORS_FILE` | no | Where operator accounts live. Defaults to `./operators.json`, which is gitignored. |
 | `HERDRELAY_ORIGIN` | no | Exact browser origin. Unset uses the request's own `Host`, so any local port works. |
 | `HERDRELAY_DATA_DIR` | no | Where incident files go. Defaults to `./data`, which is gitignored. |
 
-Live mode refuses to start a call unless **all** of the live-only variables are set. `.env.example`
-carries no real credential and no real number, and `.env` is gitignored.
+Live mode refuses to start a call unless **all** of the live-only variables are set, and unless there
+is somebody to sign in as — either a named account or the shared token. `.env.example` carries no
+real credential and no real number, and both `.env` and `operators.json` are gitignored.
+
+## Operator accounts
+
+An approval is the record that a **person** authorized a phone call, so it has to be able to say
+which person. Create an account per operator:
+
+```bash
+npm run operators:add -- --username=marta --name="Marta Nowak"
+npm run operators:list
+```
+
+The password is typed at a prompt, never echoed, never passed as an argument (which would put it in
+shell history and in `ps`), and never stored — `operators.json` holds a scrypt hash and a per-account
+salt, and is gitignored.
+
+Sign in with that username and password, and the approval, the timeline and the incident record all
+carry the name: *"Marta Nowak approved one simulated call to +1 ••••••••42."*
+
+If no account exists, live mode falls back to `HERDRELAY_AUTH_TOKEN` — one shared password for the
+whole deployment. That still gates the call, but the approval can only name the deployment, so the
+console shows an amber warning saying exactly that. A deployment that has named accounts stops
+accepting the shared token entirely.
+
+Dry run needs neither, so a fresh clone runs with no credential at all.
 
 ## Local development
 
@@ -258,6 +285,8 @@ npm test               # node --test, no credentials, no calls
 npm run check          # typecheck + tests
 npm run demo:dry-run   # the whole workflow in the terminal
 npm run demo:reset     # clear every incident, lock and reservation
+npm run operators:add  # create a named operator account
+npm run operators:list # list them
 ```
 
 ## Dry run
@@ -303,8 +332,11 @@ who has agreed, in advance, to receive AI-assisted monitoring calls at that numb
 2. Set `HERDRELAY_AUTHORIZED_E164` to the caretaker's number in exact E.164 (`+14155552671`).
    Reserved fictional numbers are rejected: they are for the dry run only.
 3. Set `HERDRELAY_CARETAKER_NAME`, and `HERDRELAY_SITE_NAME` for your farm.
-4. Set `HERDRELAY_AUTH_TOKEN` to 32+ random characters (`openssl rand -hex 32`). Live mode is never
-   open: the dashboard asks for `herdrelay` / that token.
+4. Create an operator account so approvals name a person — live mode is never open:
+   ```bash
+   npm run operators:add -- --username=marta --name="Marta Nowak"
+   ```
+   (Or set `HERDRELAY_AUTH_TOKEN` to 32+ random characters for a single shared login instead.)
 5. Set `HERDRELAY_MODE=live` and restart.
 
 In the console the badge turns red, the authorize control turns red, names the masked destination,
@@ -340,7 +372,11 @@ you reconcile it against the CALL-E dashboard before anything else happens.
 | The caller says it is an AI before asking anything | `lib/calle.ts` |
 | The brief refuses diagnosis, treatment, escalation and promises | `lib/calle.ts` |
 | Unclear answers stay unclear; contradictions fail closed | `lib/result.ts` |
-| Live mode requires a credentialed operator | `lib/access.ts` |
+| Live mode requires a signed-in operator | `lib/access.ts` |
+| Approvals record the name of the person who made them | `lib/operators.ts`, `lib/incident.ts` |
+| Passwords are scrypt-hashed with a per-account salt, never stored or recoverable | `lib/operators.ts` |
+| A wrong password and an unknown account are indistinguishable | `lib/access.ts`, `lib/operators.ts` |
+| A misconfigured caretaker number is reported as advice, never echoed back | `lib/phone.ts` |
 | Cross-origin state changes are refused | `lib/access.ts` |
 | Reset is refused in live mode | `app/api/demo/reset/route.ts` |
 
@@ -352,16 +388,17 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 70 tests
+npm test        # 82 tests
 npm run check   # typecheck + tests
 ```
 
 No test needs a credential, a network, or a phone. The suite covers E.164 handling and masking,
-redaction of anything number-shaped, the CALL-E brief and result schema, origin pinning, mode
-defaults and live-readiness, the approval fingerprint, the dry-run engine's refusal to reveal
+redaction of anything number-shaped, the CALL-E brief and result schema, origin pinning, operator
+accounts and password hashing, mode defaults and live-readiness including a misconfigured
+destination, the approval fingerprint, the dry-run engine's refusal to reveal
 terminal data early, result validation including every contradiction rule, coordination status and
-phase derivation, and the workflow end to end: approval gate, duplicate protection, per-caretaker
-reservation, halt-on-unknown, and reconciliation.
+phase derivation, and the workflow end to end: approval gate, approval attribution,
+duplicate protection, per-caretaker reservation, halt-on-unknown, and reconciliation.
 
 The end-to-end tests fast-forward the simulated clock rather than sleeping, so the suite runs in
 about 1.5 seconds.
@@ -416,10 +453,18 @@ will not enforce the cross-process locks; use a host with a real disk, or replac
 - **English only.** The brief instructs the caller to speak English throughout.
 - **The validator cannot rescue a bad transcript.** It can catch a result that disagrees with the
   transcript; it cannot catch a transcript that misheard the caretaker.
+- **Authentication is local accounts, not the farm's identity.** Operators sign in against a JSON
+  file this app owns. There is no SSO, no password reset, no lockout after repeated failures, no
+  session expiry, and no second factor. A real deployment should sit behind the farm's existing
+  Google Workspace or Microsoft identity so that leavers lose access when they leave, rather than
+  when somebody remembers to edit a file. What is here gets the audit trail right — an approval
+  names a person — without needing a registered OAuth application to run from a fresh clone.
 - **No integration with herd records.** Nothing is written back to any farm system, on purpose.
 
 ## Future work
 
+- SSO against the farm's existing identity provider, replacing local accounts, so access follows
+  employment and the approval record carries a verified identity.
 - A caretaker rota with an escalation ladder, gated behind a per-rung approval rather than a timer.
 - CALL-E terminal webhooks with signature verification, replacing the poll.
 - Callback-window awareness, so a moderate-severity alert at 02:00 waits for a reasonable hour while
@@ -541,7 +586,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 70, no credentials and no calls.
+Tests: 82, no credentials and no calls.
 ```
 
 ---

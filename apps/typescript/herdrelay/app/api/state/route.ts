@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 /** Everything the console renders on load: mode, alerts, incidents. */
 export async function GET(request: Request) {
-  const denied = requireOperator(request);
+  const { denied, operator } = await requireOperator(request);
   if (denied) return denied;
 
   const mode = callMode();
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     mode,
+    operator: { name: operator.name, shared: operator.shared },
     // Never the number itself, and never the credential: only whether the
     // configuration is complete enough to dial.
     liveReady: readiness.ready,

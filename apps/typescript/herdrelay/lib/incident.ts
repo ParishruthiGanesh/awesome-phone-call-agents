@@ -16,6 +16,7 @@ import { hasCaretakerSpeech, normalizeCall } from "./call-record";
 import { coordinationStatus, incidentPhase } from "./coordination";
 import { DryRunProviderFailure, loadScenario, simulateProgress, SIMULATED_DURATION_MS } from "./dry-run";
 import { callMode, dryRunScenario, isDryRunScenario } from "./mode";
+import type { Operator } from "./operators";
 import { buildPreview, NotDialable, previewContext, type PreviewContext } from "./preview";
 import { redact } from "./redact";
 import { validateResult } from "./result";
@@ -118,7 +119,7 @@ export function previewFor(incident: Incident, env: Env = process.env): CallPrev
 export async function approveIncident(
   id: string,
   fingerprint: string,
-  operator: string,
+  operator: Operator,
 ): Promise<{ incident: Incident; preview: CallPreview }> {
   return withIncidentLock(id, async () => {
     const incident = await requireIncident(id);
@@ -139,7 +140,9 @@ export async function approveIncident(
       mode: preview.mode,
       approval: {
         approvedAt: new Date(now).toISOString(),
-        operatorId: operator,
+        operatorId: operator.id,
+        operatorName: operator.name,
+        operatorShared: operator.shared,
         previewFingerprint: preview.fingerprint,
         recipientMasked: preview.recipientMasked,
         mode: preview.mode,
@@ -150,8 +153,8 @@ export async function approveIncident(
       step: "approved",
       detail:
         preview.mode === "live"
-          ? `Operator authorized one real call to ${preview.recipientMasked}.`
-          : `Operator approved one simulated call to ${preview.recipientMasked}. Dry run: no phone will ring.`,
+          ? `${operator.name} authorized one real call to ${preview.recipientMasked}.`
+          : `${operator.name} approved one simulated call to ${preview.recipientMasked}. Dry run: no phone will ring.`,
     });
     return { incident: withTimeline, preview };
   });
@@ -161,7 +164,7 @@ export async function approveIncident(
 // Calling
 // ---------------------------------------------------------------------------
 
-export async function placeCall(id: string, operator: string): Promise<Incident> {
+export async function placeCall(id: string, operator: Operator): Promise<Incident> {
   return withIncidentLock(id, async () => {
     const incident = await requireIncident(id);
 
@@ -172,8 +175,11 @@ export async function placeCall(id: string, operator: string): Promise<Incident>
 
     const approval = incident.approval;
     if (!approval) throw new WorkflowError("Approve the exact call before it can be placed.", 403);
-    if (approval.operatorId !== operator) {
-      throw new WorkflowError("This call was approved by a different operator.", 403);
+    if (approval.operatorId !== operator.id) {
+      throw new WorkflowError(
+        `This call was approved by ${approval.operatorName}. Only they can place it.`,
+        403,
+      );
     }
     if (!Number.isFinite(Date.parse(approval.expiresAt)) || Date.parse(approval.expiresAt) <= Date.now()) {
       throw new WorkflowError("The approval has expired. Review the preview and approve it again.", 403);

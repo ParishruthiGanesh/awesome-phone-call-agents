@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { buildTask, disclosureLine, EXPECTED_DATA, LIMITATIONS, QUESTIONS } from "./calle";
 import { dryRunDestination } from "./dry-run";
 import { liveReadiness } from "./mode";
-import { destination, type Destination } from "./phone";
+import { configuredDestinationProblem, destination, type Destination } from "./phone";
 import type { CallMode, CallPreview, LivestockAlert, Env } from "./types";
 
 export type PreviewContext = {
@@ -45,10 +45,20 @@ export function previewContext(env: Env = process.env): PreviewContext {
   if (!readiness.ready) throw new NotDialable(readiness.reason);
   return {
     mode: "live",
-    destination: destination(env.HERDRELAY_AUTHORIZED_E164!),
+    // A number that is set but malformed is a configuration error, not an
+    // unexpected failure, and the operator has to be told which. Rethrown as
+    // NotDialable so it reaches them as advice; the number itself is never
+    // echoed back, because a typo'd number is still somebody's number.
+    destination: resolveConfiguredDestination(env.HERDRELAY_AUTHORIZED_E164!),
     caretakerName: readiness.caretakerName,
     siteName: readiness.siteName,
   };
+}
+
+function resolveConfiguredDestination(configured: string): Destination {
+  const problem = configuredDestinationProblem(configured);
+  if (problem) throw new NotDialable(problem);
+  return destination(configured);
 }
 
 export function buildPreview(

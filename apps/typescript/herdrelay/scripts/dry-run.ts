@@ -9,7 +9,7 @@
  *
  *   npm run demo:dry-run -- --scenario=contradictory --alert=alert_c17_0412
  */
-import { operatorId } from "../lib/access";
+import { anonymousOperator } from "../lib/access";
 import { loadAlerts } from "../lib/alerts";
 import { scenarioLabels, SIMULATED_DURATION_MS } from "../lib/dry-run";
 import {
@@ -24,6 +24,9 @@ import {
 import { callMode } from "../lib/mode";
 import { redact } from "../lib/redact";
 import type { Incident } from "../lib/types";
+
+/** The CLI acts as one named local operator, so its approvals are attributable too. */
+const OPERATOR = { ...anonymousOperator(), name: "Command line operator" };
 
 function flag(name: string, fallback: string): string {
   const match = process.argv.find((argument) => argument.startsWith(`--${name}=`));
@@ -73,12 +76,12 @@ async function main(): Promise<void> {
   console.log("\nLimitations:");
   preview.limitations.forEach((limit) => console.log(`  - ${limit}`));
 
-  const { incident: approved } = await approveIncident(prepared.id, preview.fingerprint, operatorId());
+  const { incident: approved } = await approveIncident(prepared.id, preview.fingerprint, OPERATOR);
   console.log(`\nApproved at ${approved.approval?.approvedAt}.`);
 
   let incident: Incident;
   try {
-    incident = await placeCall(approved.id, operatorId());
+    incident = await placeCall(approved.id, OPERATOR);
   } catch (error) {
     if (error instanceof WorkflowError && error.ambiguous) {
       console.log("\n--- Halted ---\n");

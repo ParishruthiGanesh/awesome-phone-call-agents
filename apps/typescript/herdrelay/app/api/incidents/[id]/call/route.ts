@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { operatorId, requireOperator } from "@/lib/auth";
+import { requireOperator } from "@/lib/auth";
 import { placeCall, previewFor, workflowError } from "@/lib/incident";
 
 export const runtime = "nodejs";
@@ -12,11 +12,11 @@ export const runtime = "nodejs";
  * is re-derived from the server's own configuration.
  */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const denied = requireOperator(request);
+  const { denied, operator } = await requireOperator(request);
   if (denied) return denied;
   const { id } = await context.params;
   try {
-    const incident = await placeCall(id, operatorId());
+    const incident = await placeCall(id, operator);
     return NextResponse.json({ incident, preview: previewFor(incident) });
   } catch (error) {
     const { status, ...body } = workflowError(error);

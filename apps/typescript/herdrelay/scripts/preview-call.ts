@@ -13,7 +13,7 @@
  *   npm run call:preview -- --alert=alert_c17_0412
  *   npm run call:authorize -- --alert=alert_c17_0412
  */
-import { operatorId } from "../lib/access";
+import { anonymousOperator } from "../lib/access";
 import { loadAlerts } from "../lib/alerts";
 import {
   approveIncident,
@@ -27,6 +27,9 @@ import {
 import { callMode, liveReadiness } from "../lib/mode";
 import { redact } from "../lib/redact";
 import type { Incident } from "../lib/types";
+
+/** The CLI acts as one named local operator, so its approvals are attributable too. */
+const OPERATOR = { ...anonymousOperator(), name: "Command line operator" };
 
 function flag(name: string, fallback: string): string {
   const match = process.argv.find((argument) => argument.startsWith(`--${name}=`));
@@ -74,11 +77,11 @@ async function main(): Promise<void> {
   console.log(`AUTHORIZING ONE REAL CALL to ${preview.recipientMasked}.`);
   console.log("This will ring a real phone. It cannot be un-placed.\n");
 
-  const { incident: approved } = await approveIncident(incident.id, preview.fingerprint, operatorId());
+  const { incident: approved } = await approveIncident(incident.id, preview.fingerprint, OPERATOR);
 
   let current: Incident;
   try {
-    current = await placeCall(approved.id, operatorId());
+    current = await placeCall(approved.id, OPERATOR);
   } catch (error) {
     if (error instanceof WorkflowError && error.ambiguous) {
       console.error(`\n${redact(error.message)}`);

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildPreview, fingerprintPreview, NotDialable, previewContext } from "../lib/preview";
 import { DRY_RUN_PHONE } from "../lib/dry-run";
+import { liveReadiness } from "../lib/mode";
 import type { LivestockAlert } from "../lib/types";
 import type { Env } from "../lib/types";
 
@@ -39,6 +40,30 @@ test("live mode refuses to resolve a destination until it is fully configured", 
   const context = previewContext(LIVE);
   assert.equal(context.mode, "live");
   assert.equal(context.destination.phone, "+14155552671");
+});
+
+test("a number that is set but malformed says what is wrong with it, and never echoes it", () => {
+  // This is the bug that produced a bare "the action failed": a misconfigured
+  // number threw a plain Error, which the route mapped to a generic 500.
+  for (const bad of ["+1PASTE_YOUR_MOBILE", "+1 415 555 2671", "+1-415-555-2671", "4155552671", "+1415555267"]) {
+    const env = { ...LIVE, HERDRELAY_AUTHORIZED_E164: bad } as Env;
+
+    const readiness = liveReadiness(env);
+    assert.equal(readiness.ready, false, `${bad} passed readiness`);
+
+    assert.throws(
+      () => previewContext(env),
+      (error: Error) => {
+        assert.ok(error instanceof NotDialable, `${bad} threw ${error.constructor.name}`);
+        assert.match(error.message, /HERDRELAY_AUTHORIZED_E164/);
+        assert.match(error.message, /\+14155552671/); // the example, not their number
+        // Strip the example first: a truncated number can be a substring of it.
+        const withoutExample = error.message.replaceAll("+14155552671", "");
+        assert.equal(withoutExample.includes(bad), false, "the message echoed the bad number");
+        return true;
+      },
+    );
+  }
 });
 
 test("the preview shows a masked number and never the number itself", () => {

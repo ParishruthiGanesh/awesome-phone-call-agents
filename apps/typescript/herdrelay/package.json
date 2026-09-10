@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run typecheck && npm test",
+    "operators:add": "node --env-file-if-exists=.env --import tsx scripts/operators.ts add",
+    "operators:list": "node --env-file-if-exists=.env --import tsx scripts/operators.ts list",
     "demo:dry-run": "node --env-file-if-exists=.env --import tsx scripts/dry-run.ts",
     "call:preview": "node --env-file-if-exists=.env --import tsx scripts/preview-call.ts",
     "call:authorize": "node --env-file-if-exists=.env --import tsx scripts/preview-call.ts --authorize",

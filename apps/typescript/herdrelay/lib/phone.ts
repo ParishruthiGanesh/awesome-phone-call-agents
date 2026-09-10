@@ -77,3 +77,25 @@ export function maskE164(phone: string): string {
   const hidden = "•".repeat(Math.max(national.length - tail.length, 1));
   return `+${code} ${hidden}${tail}`.trim();
 }
+
+/**
+ * Why the configured caretaker number cannot be used, or `null` if it can.
+ *
+ * The banner on the console and the preview resolver both call this, so a
+ * misconfigured number is reported the same way whether the operator has
+ * clicked anything yet or not — and neither path can be stricter than the
+ * other. The offending value is never included in the message: a typo'd number
+ * is still somebody's number.
+ */
+export function configuredDestinationProblem(value: string | undefined): string | null {
+  if (!value) {
+    return "No authorized caretaker number is configured. Set HERDRELAY_AUTHORIZED_E164.";
+  }
+  try {
+    destination(value);
+    return null;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "It is not a dialable number.";
+    return `HERDRELAY_AUTHORIZED_E164 is set but unusable. ${reason} Write it as a country code and digits with no spaces, dashes, brackets or extension, for example +14155552671.`;
+  }
+}
