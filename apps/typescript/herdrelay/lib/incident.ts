@@ -79,6 +79,7 @@ export async function prepareIncident(alertId: string, requestedScenario?: strin
     callId: null,
     call: null,
     createState: null,
+    reservationKey: null,
     validated: null,
     coordinationStatus: null,
     humanReviewRequired: true,
@@ -218,8 +219,8 @@ async function startDryRun(incident: Incident, context: PreviewContext): Promise
 
   // Reserved even in dry run: the duplicate-protection path is the one thing a
   // rehearsal most needs to rehearse.
-  await reserveDestination(phone, incident.id);
-  await updateIncident(incident.id, { createState: "creating" });
+  const reservationKey = await reserveDestination(phone, incident.id);
+  await updateIncident(incident.id, { createState: "creating", reservationKey });
 
   let fixture;
   try {
@@ -249,6 +250,7 @@ async function startDryRun(incident: Incident, context: PreviewContext): Promise
     callId: record.callId,
     call: record,
     createState: "accepted",
+    reservationKey,
     phase: "calling",
   });
   return appendTimeline(started, {
@@ -264,8 +266,8 @@ async function startLiveCall(incident: Incident, context: PreviewContext): Promi
   // before anything is reserved and long before anything is sent.
   const client = calleClient();
 
-  await reserveDestination(phone, incident.id);
-  await updateIncident(incident.id, { createState: "creating" });
+  const reservationKey = await reserveDestination(phone, incident.id);
+  await updateIncident(incident.id, { createState: "creating", reservationKey });
 
   try {
     const call = await client.calls.create(
@@ -287,6 +289,7 @@ async function startLiveCall(incident: Incident, context: PreviewContext): Promi
       callId: record.callId,
       call: record,
       createState: "accepted",
+      reservationKey,
       phase: incidentPhase(record, null),
     });
     return appendTimeline(started, {
@@ -414,21 +417,14 @@ export async function finalize(incident: Incident, record: CallRecord): Promise<
   let saved = await saveIncident(next);
   for (const entry of entries) saved = await appendTimeline(saved, entry);
 
-  // The number is only released once the call's fate is known, so an
-  // interrupted call keeps blocking a redial until a human resolves it.
-  if (terminal) {
-    const phone = safeDestinationPhone();
-    if (phone) await releaseDestination(phone, incident.id);
+  // The caretaker is freed once this call's fate is known. Only an unresolved
+  // outcome keeps blocking, and it blocks until a human resolves it — a call
+  // that finished, however badly, must not stop the next animal being called
+  // about.
+  if (terminal && saved.reservationKey) {
+    await releaseDestination(saved.reservationKey, incident.id);
   }
   return saved;
-}
-
-function safeDestinationPhone(): string | null {
-  try {
-    return previewContext().destination.phone;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -444,8 +440,7 @@ export async function reconcileIncident(id: string, callId: string): Promise<Inc
     }
     if (incident.mode === "dry_run") {
       const resolved = await saveIncident({ ...incident, createState: null, phase: "failed" });
-      const phone = safeDestinationPhone();
-      if (phone) await releaseDestination(phone, incident.id);
+      if (incident.reservationKey) await releaseDestination(incident.reservationKey, incident.id);
       return appendTimeline(resolved, {
         step: "call_ended",
         detail: "Simulated failure acknowledged. The incident is closed without a call.",
@@ -478,12 +473,22 @@ async function requireIncident(id: string): Promise<Incident> {
 }
 
 /** Map any thrown value onto a safe HTTP response body. */
-export function workflowError(error: unknown): { error: string; status: number; ambiguous: boolean } {
+export function workflowError(error: unknown): {
+  error: string;
+  status: number;
+  ambiguous: boolean;
+  blockingIncidentId?: string;
+} {
   if (error instanceof WorkflowError) {
     return { error: redact(error.message), status: error.status, ambiguous: error.ambiguous };
   }
   if (error instanceof IncidentConflict) {
-    return { error: redact(error.message), status: 409, ambiguous: true };
+    return {
+      error: redact(error.message),
+      status: 409,
+      ambiguous: true,
+      blockingIncidentId: error.blockingIncidentId,
+    };
   }
   if (error instanceof NotDialable) {
     return { error: redact(error.message), status: 503, ambiguous: false };

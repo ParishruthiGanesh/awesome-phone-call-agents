@@ -215,6 +215,13 @@ export type Incident = {
   callId: string | null;
   call: CallRecord | null;
   createState: CreateState | null;
+  /**
+   * The caretaker reservation this incident holds, as the opaque key the store
+   * uses. Stored rather than re-derived, so that editing the configured
+   * caretaker number mid-incident cannot strand the reservation. It is a hash,
+   * never a number.
+   */
+  reservationKey: string | null;
   validated: ValidatedResult | null;
   coordinationStatus: CoordinationStatus | null;
   humanReviewRequired: boolean;

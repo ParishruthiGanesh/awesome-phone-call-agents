@@ -22,13 +22,15 @@ import {
   reconcileIncident,
   WorkflowError,
 } from "../lib/incident";
-import { getIncident, listIncidents, readReservation, resetAll, saveIncident } from "../lib/store";
+import { destinationKey, getIncident, listIncidents, readReservation, resetAll, saveIncident } from "../lib/store";
 import { DRY_RUN_PHONE, SIMULATED_DURATION_MS } from "../lib/dry-run";
+import { IncidentConflict } from "../lib/store";
 import type { Incident } from "../lib/types";
 import type { Env } from "../lib/types";
 
 const ALERT = "alert_c17_0412";
 const OPERATOR = { ...anonymousOperator({} as Env), name: "Marta Nowak" };
+const CARETAKER = destinationKey(DRY_RUN_PHONE);
 
 before(async () => {
   process.env.HERDRELAY_DATA_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "herdrelay-test-"));
@@ -58,7 +60,7 @@ test("preparing an incident places no call and leaves nothing reserved", async (
   assert.equal(incident.phase, "planned");
   assert.equal(incident.callId, null);
   assert.equal(incident.createState, null);
-  assert.equal(await readReservation(DRY_RUN_PHONE), null);
+  assert.equal(await readReservation(CARETAKER), null);
   assert.deepEqual(incident.timeline.map((entry) => entry.step), ["alert_received", "call_prepared"]);
 });
 
@@ -99,7 +101,7 @@ test("the approved call runs to a validated result, and the record holds no phon
   const approved = await approvedIncident();
   const placed = await placeCall(approved.id, OPERATOR);
   assert.equal(placed.phase, "calling");
-  assert.equal(await readReservation(DRY_RUN_PHONE), approved.id);
+  assert.equal(await readReservation(CARETAKER), approved.id);
 
   const finished = await fastForward(placed);
   assert.ok(isFinished(finished));
@@ -113,7 +115,7 @@ test("the approved call runs to a validated result, and the record holds no phon
   assert.equal(JSON.stringify(finished).includes("2025550142"), false);
 
   // The number is free again only now that the call's fate is known.
-  assert.equal(await readReservation(DRY_RUN_PHONE), null);
+  assert.equal(await readReservation(CARETAKER), null);
   assert.deepEqual(
     finished.timeline.map((entry) => entry.step),
     ["alert_received", "call_prepared", "approved", "dialing", "call_connected", "call_ended", "result_validated"],
@@ -143,14 +145,71 @@ test("an alert cannot be given a second incident while its first is live", async
   assert.equal((await listIncidents()).length, 1);
 });
 
-test("a second caretaker call is refused while the first is unresolved", async () => {
-  const approved = await approvedIncident();
-  await placeCall(approved.id, OPERATOR);
-  // A different alert, the same caretaker: the reservation is on the number.
+test("a finished call frees the caretaker, so the next animal can be called about", async () => {
+  // The bug this pins: one messy incident used to hold the only caretaker on
+  // the farm forever, blocking every other animal.
+  const first = await approvedIncident();
+  const finished = await fastForward(await placeCall(first.id, OPERATOR));
+  assert.ok(isFinished(finished));
+  assert.equal(await readReservation(CARETAKER), null);
+
+  const second = await prepareIncident("alert_d22_0411");
+  const preview = previewFor(second);
+  await approveIncident(second.id, preview.fingerprint, OPERATOR);
+  const placed = await placeCall(second.id, OPERATOR);
+  assert.equal(placed.phase, "calling");
+});
+
+test("a reservation left behind by a finished incident is debris, and is taken over", async () => {
+  const stale = await approvedIncident();
+  await fastForward(await placeCall(stale.id, OPERATOR));
+  // Simulate the marker surviving the incident that owned it.
+  await saveIncident({ ...(await getIncident(stale.id))!, reservationKey: null });
+  const revived = await getIncident(stale.id);
+  assert.equal(isFinished(revived!), true);
+
+  const next = await prepareIncident("alert_d22_0411");
+  const preview = previewFor(next);
+  await approveIncident(next.id, preview.fingerprint, OPERATOR);
+  await assert.doesNotReject(() => placeCall(next.id, OPERATOR));
+});
+
+test("the caretaker is freed even if the configured number changes mid-incident", async () => {
+  const incident = await approvedIncident();
+  const placed = await placeCall(incident.id, OPERATOR);
+  assert.equal(await readReservation(CARETAKER), incident.id);
+  // Release must use the key stored at reserve time, not one re-derived now.
+  const finished = await fastForward(placed);
+  assert.ok(isFinished(finished));
+  assert.equal(await readReservation(CARETAKER), null);
+});
+
+test("a blocked call names the incident holding the caretaker", async () => {
+  const blocker = await approvedIncident("provider_failure");
+  await placeCall(blocker.id, OPERATOR).catch(() => undefined);
+
   const other = await prepareIncident("alert_d22_0411");
   const preview = previewFor(other);
   await approveIncident(other.id, preview.fingerprint, OPERATOR);
-  await assert.rejects(() => placeCall(other.id, OPERATOR), /call in flight or unresolved/);
+  await assert.rejects(() => placeCall(other.id, OPERATOR), (error: IncidentConflict) => {
+    assert.match(error.message, /unresolved call for animal C-17/);
+    assert.equal(error.blockingIncidentId, blocker.id);
+    return true;
+  });
+
+  // Resolving the blocker frees the caretaker for the next animal.
+  await reconcileIncident(blocker.id, "");
+  await assert.doesNotReject(() => placeCall(other.id, OPERATOR));
+});
+
+test("a call still in flight holds the caretaker, whatever the animal", async () => {
+  const approved = await approvedIncident();
+  await placeCall(approved.id, OPERATOR); // in flight, not finished
+  // A different alert, the same caretaker: the reservation is on the person.
+  const other = await prepareIncident("alert_d22_0411");
+  const preview = previewFor(other);
+  await approveIncident(other.id, preview.fingerprint, OPERATOR);
+  await assert.rejects(() => placeCall(other.id, OPERATOR), /unresolved call for animal C-17/);
 });
 
 test("an unknown provider outcome halts calling instead of retrying", async () => {
@@ -165,7 +224,7 @@ test("an unknown provider outcome halts calling instead of retrying", async () =
   assert.equal(halted?.createState, "ambiguous");
   assert.equal(halted?.phase, "failed");
   // The reservation is deliberately still held: the number is not free to redial.
-  assert.equal(await readReservation(DRY_RUN_PHONE), approved.id);
+  assert.equal(await readReservation(CARETAKER), approved.id);
 
   // And a retry is refused rather than quietly re-sent.
   await assert.rejects(() => placeCall(approved.id, OPERATOR), /does not know whether this call was placed/);
@@ -177,7 +236,7 @@ test("reconciling an unknown outcome closes it and frees the caretaker", async (
   const closed = await reconcileIncident(approved.id, "");
   assert.equal(closed.createState, null);
   assert.equal(closed.phase, "failed");
-  assert.equal(await readReservation(DRY_RUN_PHONE), null);
+  assert.equal(await readReservation(CARETAKER), null);
 });
 
 test("a scenario whose answers contradict the transcript ends uncertain, not confirmed", async () => {
@@ -203,5 +262,5 @@ test("resetting clears every incident, lock, and reservation", async () => {
   await placeCall(approved.id, OPERATOR);
   await resetAll();
   assert.deepEqual(await listIncidents(), []);
-  assert.equal(await readReservation(DRY_RUN_PHONE), null);
+  assert.equal(await readReservation(CARETAKER), null);
 });

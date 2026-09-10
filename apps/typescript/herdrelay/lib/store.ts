@@ -18,7 +18,12 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { Incident, TimelineEntry, Env } from "./types";
 
-export class IncidentConflict extends Error {}
+export class IncidentConflict extends Error {
+  /** The incident holding the thing this one wanted, when there is one. */
+  constructor(message: string, public blockingIncidentId?: string) {
+    super(message);
+  }
+}
 
 const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -145,8 +150,27 @@ export async function withIncidentLock<T>(id: string, action: () => Promise<T>):
 // ---------------------------------------------------------------------------
 
 /** The marker filename is a hash, so a directory listing is not a phone book. */
-function destinationFile(phone: string): string {
-  return path.join(dataDir(), "destinations", `${createHash("sha256").update(phone).digest("hex")}.json`);
+export function destinationKey(phone: string): string {
+  return createHash("sha256").update(phone).digest("hex");
+}
+
+function destinationFile(key: string): string {
+  return path.join(dataDir(), "destinations", `${key}.json`);
+}
+
+/**
+ * Does this incident still owe us an answer about whether a phone rang?
+ *
+ * Only an incident in that state may hold a caretaker. An incident that
+ * finished — completed, failed, unanswered, uncertain — has nothing left to
+ * resolve, and a marker it left behind is debris rather than protection.
+ * Anything else would mean one messy call blocks every future call to that
+ * person forever, which is not caution, it is a broken rota.
+ */
+function stillHoldsCaretaker(incident: Incident): boolean {
+  // An unknown create outcome is exactly the case the reservation exists for.
+  if (incident.createState === "creating" || incident.createState === "ambiguous") return true;
+  return ["calling", "in_progress"].includes(incident.phase);
 }
 
 /**
@@ -156,22 +180,45 @@ function destinationFile(phone: string): string {
  * request's fate is unknown, the marker stays and every further attempt at that
  * number is refused until a human reconciles it.
  */
-export async function reserveDestination(phone: string, incidentId: string): Promise<void> {
-  const file = destinationFile(phone);
+export async function reserveDestination(phone: string, incidentId: string): Promise<string> {
+  const key = destinationKey(phone);
+  const file = destinationFile(key);
   await fs.mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
+
   let handle;
   try {
     handle = await fs.open(file, "wx", 0o600);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-      const holder = await readReservation(phone);
-      if (holder === incidentId) return;
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+
+    const holderId = await readReservation(key);
+    if (holderId === incidentId) return key;
+
+    const holder = holderId ? await getIncident(holderId) : null;
+    if (holder && stillHoldsCaretaker(holder)) {
       throw new IncidentConflict(
-        "That caretaker already has a call in flight or unresolved. Resolve it before calling again; HerdRelay will not redial.",
+        `That caretaker has an unresolved call for animal ${holder.alert.animalId}. Resolve that incident before calling again; HerdRelay will not redial.`,
+        holder.id,
       );
     }
-    throw error;
+
+    // The holder finished, or its record is gone. The marker is debris, and
+    // debris must not stop the next animal being called about.
+    await writeReservation(file, incidentId);
+    return key;
   }
+
+  try {
+    await handle.writeFile(JSON.stringify({ incidentId }));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  return key;
+}
+
+async function writeReservation(file: string, incidentId: string): Promise<void> {
+  const handle = await fs.open(file, "w", 0o600);
   try {
     await handle.writeFile(JSON.stringify({ incidentId }));
     await handle.sync();
@@ -180,9 +227,9 @@ export async function reserveDestination(phone: string, incidentId: string): Pro
   }
 }
 
-export async function readReservation(phone: string): Promise<string | null> {
+export async function readReservation(key: string): Promise<string | null> {
   try {
-    const marker = JSON.parse(await fs.readFile(destinationFile(phone), "utf8"));
+    const marker = JSON.parse(await fs.readFile(destinationFile(key), "utf8"));
     return typeof marker?.incidentId === "string" ? marker.incidentId : null;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -190,9 +237,14 @@ export async function readReservation(phone: string): Promise<string | null> {
   }
 }
 
-export async function releaseDestination(phone: string, incidentId: string): Promise<void> {
-  if ((await readReservation(phone)) !== incidentId) return;
-  await fs.rm(destinationFile(phone), { force: true });
+/**
+ * Release by the key stored when the reservation was taken, never by
+ * re-deriving it from the current configuration: a caretaker number edited
+ * mid-incident would otherwise strand the marker forever.
+ */
+export async function releaseDestination(key: string, incidentId: string): Promise<void> {
+  if ((await readReservation(key)) !== incidentId) return;
+  await fs.rm(destinationFile(key), { force: true });
 }
 
 /** Wipe every incident, lock, and reservation. The demo reset button. */

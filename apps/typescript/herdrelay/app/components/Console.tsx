@@ -24,13 +24,21 @@ type ConsoleState = {
 const POLL_MS = 1200;
 const FINISHED = ["completed", "failed", "unanswered", "uncertain"];
 
+class ApiError extends Error {
+  constructor(message: string, public blockingIncidentId?: string) {
+    super(message);
+  }
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error ?? `Request failed (${response.status}).`);
+  if (!response.ok) {
+    throw new ApiError(body?.error ?? `Request failed (${response.status}).`, body?.blockingIncidentId);
+  }
   return body as T;
 }
 
@@ -42,6 +50,10 @@ export function Console() {
   const [scenario, setScenario] = useState<string>("inspection_confirmed");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When a conflict names the incident holding the caretaker, the operator gets
+  // a way to it. A dead-end error on the one screen that can resolve it is not
+  // a safety feature, it is a trap.
+  const [blockingIncidentId, setBlockingIncidentId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Guards a second submit while the first is still in flight. The server
   // refuses duplicates too; this only spares the operator the error.
@@ -86,10 +98,14 @@ export function Console() {
     inFlight.current = true;
     setBusy(true);
     setError(null);
+    setBlockingIncidentId(null);
     try {
       await action();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The action failed.");
+      if (cause instanceof ApiError && cause.blockingIncidentId) {
+        setBlockingIncidentId(cause.blockingIncidentId);
+      }
     } finally {
       inFlight.current = false;
       setBusy(false);
@@ -307,7 +323,32 @@ export function Console() {
         </div>
 
         <div className="space-y-5">
-          {error ? <Notice tone="red" title="ACTION FAILED">{error}</Notice> : null}
+          {error ? (
+            <Notice tone="red" title="ACTION FAILED">
+              <p>{error}</p>
+              {blockingIncidentId ? (
+                <div className="mt-3">
+                  <Button
+                    onClick={() =>
+                      act(async () => {
+                        const body = await api<{ incident: Incident; preview: CallPreview }>(
+                          `/api/incidents/${blockingIncidentId}`,
+                        );
+                        setIncident(body.incident);
+                        setPreview(body.preview);
+                        setSelected(
+                          state?.alerts.find((alert) => alert.id === body.incident.alert.id) ?? null,
+                        );
+                      })
+                    }
+                    disabled={busy}
+                  >
+                    Open the blocking incident
+                  </Button>
+                </div>
+              ) : null}
+            </Notice>
+          ) : null}
 
           {incident && preview && !incident.callId && incident.createState !== "ambiguous" ? (
             <Panel className="p-5">
