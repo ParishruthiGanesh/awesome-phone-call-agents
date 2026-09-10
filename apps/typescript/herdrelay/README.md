@@ -133,7 +133,7 @@ apps/typescript/herdrelay/
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       82 tests, no credentials, no calls
+├── tests/                       86 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -145,7 +145,14 @@ guarantee is a guarantee against one browser tab:
 
 - an **incident lock** serializes approve, place and poll for one incident;
 - a **destination reservation**, keyed by a hash of the number, stops two incidents dialing the
-  same caretaker and stays held while a call's fate is unknown.
+  same caretaker.
+
+The reservation is held only while an outcome is genuinely unknown — a call in flight, or a create
+request that never came back. A call that finished, however badly, releases it: one caretaker usually
+covers a whole farm, so a messy incident must never block every other animal. It is released by the
+key stored when the reservation was taken rather than one re-derived from current configuration, so
+editing the caretaker number mid-incident cannot strand it, and a reservation whose incident has
+finished is treated as debris and taken over.
 
 No incident file ever contains a phone number. `normalizeCall()` drops the recipient's number at the
 provider boundary, and a test asserts it.
@@ -366,6 +373,8 @@ you reconcile it against the CALL-E dashboard before anything else happens.
 | A live authorize requires typing `AUTHORIZE` | `app/components/CallPreviewPanel.tsx` |
 | One call per incident; a second start returns the first call | `lib/incident.ts` |
 | One in-flight call per caretaker, held while the outcome is unknown | `lib/store.ts` |
+| A finished call frees the caretaker, so the next animal is never blocked | `lib/store.ts`, `lib/incident.ts` |
+| A blocked call names the incident holding the caretaker, and links to it | `lib/store.ts`, `app/components/Console.tsx` |
 | An unknown create outcome halts and never retries | `lib/incident.ts` |
 | Numbers are masked in the UI, in incident files, and in logs | `lib/phone.ts`, `lib/redact.ts` |
 | Provider errors are redacted before they reach a response | `lib/incident.ts` |
@@ -388,7 +397,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 82 tests
+npm test        # 86 tests
 npm run check   # typecheck + tests
 ```
 
@@ -398,7 +407,8 @@ accounts and password hashing, mode defaults and live-readiness including a misc
 destination, the approval fingerprint, the dry-run engine's refusal to reveal
 terminal data early, result validation including every contradiction rule, coordination status and
 phase derivation, and the workflow end to end: approval gate, approval attribution,
-duplicate protection, per-caretaker reservation, halt-on-unknown, and reconciliation.
+duplicate protection, the per-caretaker reservation and its release, halt-on-unknown, and
+reconciliation.
 
 The end-to-end tests fast-forward the simulated clock rather than sleeping, so the suite runs in
 about 1.5 seconds.
@@ -586,7 +596,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 82, no credentials and no calls.
+Tests: 86, no credentials and no calls.
 ```
 
 ---
