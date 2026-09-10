@@ -133,7 +133,7 @@ apps/typescript/herdrelay/
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       86 tests, no credentials, no calls
+├── tests/                       91 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -355,9 +355,12 @@ From the terminal, the same call with the same gates:
 npm run call:authorize -- --alert=alert_c17_0412
 ```
 
-If the create request fails or times out, HerdRelay **does not retry**, even with an idempotency
-key: it does not know whether a phone rang. The incident halts, the caretaker stays reserved, and
-you reconcile it against the CALL-E dashboard before anything else happens.
+If the create request fails, what happens depends on what failed. A request CALL-E *refused* — a bad
+key, an exhausted balance, a rate limit, a malformed body — never reached a carrier, so the incident
+fails cleanly, the caretaker is freed, and the reason is shown and logged. A timeout or a dropped
+connection is genuinely unknown, so HerdRelay **does not retry**, even with an idempotency key: the
+incident halts, the caretaker stays reserved, and you reconcile it against the CALL-E dashboard
+before anything else happens. Anything HerdRelay does not recognise is treated as unknown.
 
 ## Safety and consent
 
@@ -376,6 +379,8 @@ you reconcile it against the CALL-E dashboard before anything else happens.
 | A finished call frees the caretaker, so the next animal is never blocked | `lib/store.ts`, `lib/incident.ts` |
 | A blocked call names the incident holding the caretaker, and links to it | `lib/store.ts`, `app/components/Console.tsx` |
 | An unknown create outcome halts and never retries | `lib/incident.ts` |
+| A request the provider refused fails cleanly and frees the caretaker, because no phone rang | `lib/calle.ts` |
+| Only the provider itself can establish that no call was placed; anything unrecognised is unknown | `lib/calle.ts` |
 | Numbers are masked in the UI, in incident files, and in logs | `lib/phone.ts`, `lib/redact.ts` |
 | Provider errors are redacted before they reach a response | `lib/incident.ts` |
 | The caller says it is an AI before asking anything | `lib/calle.ts` |
@@ -397,7 +402,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 86 tests
+npm test        # 91 tests
 npm run check   # typecheck + tests
 ```
 
@@ -596,7 +601,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 86, no credentials and no calls.
+Tests: 91, no credentials and no calls.
 ```
 
 ---

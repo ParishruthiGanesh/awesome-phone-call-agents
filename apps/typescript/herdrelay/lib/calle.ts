@@ -1,5 +1,12 @@
 /** CALL-E client, the spoken brief, and the strict result schema. */
-import { CalleClient } from "@call-e/calle";
+import {
+  CalleAPIError,
+  CalleAuthenticationError,
+  CalleClient,
+  CalleConnectionError,
+  CalleRateLimitError,
+  CalleTimeoutError,
+} from "@call-e/calle";
 import type { LivestockAlert, Env } from "./types";
 
 const CALLE_ORIGIN = "https://api.heycall-e.com";
@@ -211,5 +218,84 @@ export function buildResultSchema(): Record<string, unknown> {
       "human_review_required",
     ],
     additionalProperties: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// What a failed create actually means
+// ---------------------------------------------------------------------------
+
+export type CreateFailure = {
+  /**
+   * Whether a phone may have rung. `"no"` only when the provider rejected the
+   * request outright; `"unknown"` for everything else, including anything
+   * unrecognised.
+   */
+  dialed: "no" | "unknown";
+  /** Plain-language reason for the operator. Redact before display. */
+  reason: string;
+  /** The provider's own code, kept so a failure stays debuggable. */
+  code: string | null;
+};
+
+/**
+ * Classify a failure from `calls.create`.
+ *
+ * The distinction is the whole point. A request the API refused — a bad key, a
+ * malformed body, a rate limit, an exhausted balance — never reached a carrier,
+ * so treating it as "we might have called somebody" strands the incident and
+ * locks the caretaker for no reason. A timeout or a dropped connection is
+ * genuinely unknown, and that one must fail closed.
+ *
+ * Anything unrecognised is unknown. This function only ever says "no phone
+ * rang" when the provider said so itself.
+ */
+export function classifyCreateFailure(error: unknown): CreateFailure {
+  if (error instanceof CalleTimeoutError || error instanceof CalleConnectionError) {
+    return {
+      dialed: "unknown",
+      reason: "The call request did not complete, so it is not known whether a phone rang.",
+      code: error instanceof CalleTimeoutError ? "timeout" : "connection_error",
+    };
+  }
+
+  if (error instanceof CalleAuthenticationError) {
+    return {
+      dialed: "no",
+      reason:
+        "CALL-E rejected the credentials, so no call was placed. Check CALLE_API_KEY, then try again.",
+      code: error.code,
+    };
+  }
+
+  if (error instanceof CalleRateLimitError) {
+    return {
+      dialed: "no",
+      reason: "CALL-E is rate limiting this account, so no call was placed. Wait, then try again.",
+      code: error.code,
+    };
+  }
+
+  if (error instanceof CalleAPIError) {
+    // 4xx is the provider refusing the request. 408 is the exception: a request
+    // timeout may have been received and acted on.
+    if (error.status >= 400 && error.status < 500 && error.status !== 408) {
+      return {
+        dialed: "no",
+        reason: `CALL-E refused the call request (${error.status} ${error.code}), so no call was placed. ${error.message}`,
+        code: error.code,
+      };
+    }
+    return {
+      dialed: "unknown",
+      reason: `CALL-E returned an error (${error.status} ${error.code}) and it is not known whether a phone rang.`,
+      code: error.code,
+    };
+  }
+
+  return {
+    dialed: "unknown",
+    reason: "The call request failed in a way HerdRelay does not recognise.",
+    code: null,
   };
 }

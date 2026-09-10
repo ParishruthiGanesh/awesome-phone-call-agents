@@ -10,7 +10,7 @@
  * whether a phone rang, so it stops and says so rather than retrying.
  */
 import { findAlert } from "./alerts";
-import { buildResultSchema, buildTask } from "./calle";
+import { buildResultSchema, buildTask, classifyCreateFailure } from "./calle";
 import { calleClient } from "./calle";
 import { hasCaretakerSpeech, normalizeCall } from "./call-record";
 import { coordinationStatus, incidentPhase } from "./coordination";
@@ -18,7 +18,7 @@ import { DryRunProviderFailure, loadScenario, simulateProgress, SIMULATED_DURATI
 import { callMode, dryRunScenario, isDryRunScenario } from "./mode";
 import type { Operator } from "./operators";
 import { buildPreview, NotDialable, previewContext, type PreviewContext } from "./preview";
-import { redact } from "./redact";
+import { logSafe, redact } from "./redact";
 import { validateResult } from "./result";
 import {
   appendTimeline,
@@ -298,10 +298,33 @@ async function startLiveCall(incident: Incident, context: PreviewContext): Promi
     });
   } catch (error) {
     if (error instanceof WorkflowError) throw error;
+
+    const failure = classifyCreateFailure(error);
+    // The provider's own words, kept out of the response but written to the
+    // server log so a failure stays debuggable.
+    logSafe(`Call create failed for incident ${incident.id}: ${failure.reason}`, {
+      code: failure.code ?? "none",
+      dialed: failure.dialed,
+    });
+
+    if (failure.dialed === "no") {
+      // The provider refused the request, so no phone rang. Fail cleanly:
+      // release the caretaker and say why. Halting here would strand the
+      // incident and block every other animal for no reason at all.
+      const closed = await updateIncident(incident.id, { createState: null, phase: "failed" });
+      await releaseDestination(reservationKey, incident.id).catch(() => undefined);
+      if (closed) {
+        await appendTimeline(closed, { step: "call_ended", detail: redact(failure.reason) }).catch(
+          () => undefined,
+        );
+      }
+      throw new WorkflowError(redact(failure.reason), 502, false);
+    }
+
     // Never repeat the POST, idempotency key or not: a timeout or an
     // unreadable response may already have dialed.
     await updateIncident(incident.id, { createState: "ambiguous", phase: "failed" }).catch(() => undefined);
-    throw new WorkflowError(AMBIGUOUS_MESSAGE, 502, true);
+    throw new WorkflowError(`${redact(failure.reason)} ${AMBIGUOUS_MESSAGE}`, 502, true);
   }
 }
 
