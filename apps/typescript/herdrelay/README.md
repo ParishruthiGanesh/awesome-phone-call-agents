@@ -133,7 +133,7 @@ apps/typescript/herdrelay/
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       91 tests, no credentials, no calls
+├── tests/                       94 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -375,6 +375,7 @@ before anything else happens. Anything HerdRelay does not recognise is treated a
 | Approvals expire after 10 minutes | `lib/incident.ts` |
 | A live authorize requires typing `AUTHORIZE` | `app/components/CallPreviewPanel.tsx` |
 | One call per incident; a second start returns the first call | `lib/incident.ts` |
+| A finished incident can be attempted again; only an unresolved one blocks | `lib/store.ts` |
 | One in-flight call per caretaker, held while the outcome is unknown | `lib/store.ts` |
 | A finished call frees the caretaker, so the next animal is never blocked | `lib/store.ts`, `lib/incident.ts` |
 | A blocked call names the incident holding the caretaker, and links to it | `lib/store.ts`, `app/components/Console.tsx` |
@@ -402,7 +403,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 91 tests
+npm test        # 94 tests
 npm run check   # typecheck + tests
 ```
 
@@ -601,7 +602,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 91, no credentials and no calls.
+Tests: 94, no credentials and no calls.
 ```
 
 ---

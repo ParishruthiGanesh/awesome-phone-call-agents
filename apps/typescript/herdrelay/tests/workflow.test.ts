@@ -138,6 +138,39 @@ test("placing the same approved call twice does not place a second call", async 
   assert.deepEqual(second.timeline.filter((entry) => entry.step === "dialing").length, 1);
 });
 
+test("an alert whose call finished can be attempted again", async () => {
+  // The bug this pins: a failed call used to make that animal uncallable
+  // forever, so a transient provider failure was permanent.
+  for (const scenario of ["unanswered", "declined", "inspection_confirmed"]) {
+    const incident = await approvedIncident(scenario);
+    const finished = await fastForward(await placeCall(incident.id, OPERATOR));
+    assert.ok(isFinished(finished), `${scenario} did not finish`);
+    await assert.doesNotReject(
+      () => prepareIncident(ALERT),
+      `${scenario} blocked a fresh attempt`,
+    );
+  }
+});
+
+test("a retry after a failure is a new incident, and the alert shows the newest", async () => {
+  const first = await approvedIncident("unanswered");
+  await fastForward(await placeCall(first.id, OPERATOR));
+  const second = await prepareIncident(ALERT);
+  assert.notEqual(second.id, first.id);
+  assert.equal(second.phase, "planned");
+  assert.equal((await listIncidents())[0]?.id, second.id);
+});
+
+test("an unresolved incident still blocks, and names itself", async () => {
+  const blocker = await approvedIncident("provider_failure");
+  await placeCall(blocker.id, OPERATOR).catch(() => undefined);
+  await assert.rejects(() => prepareIncident(ALERT), (error: WorkflowError) => {
+    assert.match(error.message, /already has an incident in progress/);
+    assert.equal(error.blockingIncidentId, blocker.id);
+    return true;
+  });
+});
+
 test("an alert cannot be given a second incident while its first is live", async () => {
   const approved = await approvedIncident();
   await placeCall(approved.id, OPERATOR);

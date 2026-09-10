@@ -35,7 +35,13 @@ import {
 import type { CallPreview, CallRecord, Incident, TimelineEntry, Env } from "./types";
 
 export class WorkflowError extends Error {
-  constructor(message: string, public status: number, public ambiguous = false) {
+  constructor(
+    message: string,
+    public status: number,
+    public ambiguous = false,
+    /** The incident standing in this one's way, when there is one. */
+    public blockingIncidentId?: string,
+  ) {
     super(message);
   }
 }
@@ -59,6 +65,8 @@ export async function prepareIncident(alertId: string, requestedScenario?: strin
     throw new WorkflowError(
       `Alert ${alert.animalId} already has an incident in progress (${open.phase}). Open it instead of starting a second one.`,
       409,
+      false,
+      open.id,
     );
   }
 
@@ -503,7 +511,12 @@ export function workflowError(error: unknown): {
   blockingIncidentId?: string;
 } {
   if (error instanceof WorkflowError) {
-    return { error: redact(error.message), status: error.status, ambiguous: error.ambiguous };
+    return {
+      error: redact(error.message),
+      status: error.status,
+      ambiguous: error.ambiguous,
+      blockingIncidentId: error.blockingIncidentId,
+    };
   }
   if (error instanceof IncidentConflict) {
     return {

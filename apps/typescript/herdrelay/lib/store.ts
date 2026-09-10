@@ -101,10 +101,26 @@ export async function listIncidents(): Promise<Incident[]> {
   return incidents.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/** The one open incident for an alert, if any. Duplicate protection starts here. */
+const TERMINAL_PHASES = new Set(["completed", "failed", "unanswered", "uncertain"]);
+
+/**
+ * Is this incident still owed an answer?
+ *
+ * Duplicate protection is about not running two attempts at once, not about
+ * making an animal uncallable forever. An incident that reached a terminal
+ * phase — including one that failed — is finished, and a person deciding to try
+ * again is a new decision, not an automatic redial. Only an incident that is
+ * still live, or whose create outcome is unknown, blocks a fresh attempt.
+ */
+export function isUnresolved(incident: Incident): boolean {
+  if (incident.createState === "creating" || incident.createState === "ambiguous") return true;
+  return !TERMINAL_PHASES.has(incident.phase) && incident.phase !== "planned";
+}
+
+/** The one unresolved incident for an alert, if any. Duplicate protection starts here. */
 export async function findOpenIncidentForAlert(alertId: string): Promise<Incident | null> {
   const open = (await listIncidents()).filter(
-    (incident) => incident.alert.id === alertId && incident.phase !== "planned",
+    (incident) => incident.alert.id === alertId && isUnresolved(incident),
   );
   return open[0] ?? null;
 }
@@ -172,6 +188,8 @@ function stillHoldsCaretaker(incident: Incident): boolean {
   if (incident.createState === "creating" || incident.createState === "ambiguous") return true;
   return ["calling", "in_progress"].includes(incident.phase);
 }
+
+export { TERMINAL_PHASES };
 
 /**
  * Claim a number before any network call.
