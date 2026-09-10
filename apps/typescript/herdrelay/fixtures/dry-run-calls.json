@@ -1,0 +1,673 @@
+{
+  "note": "SYNTHETIC. Hand-authored CALL-E responses so the whole workflow, including every failure state, can be demonstrated and tested without placing a call or spending CALL-E credits. The number is the reserved fictional +1 555-01xx range and belongs to nobody. Each fixture is pushed back through normalizeCall(), the same boundary a live call crosses, so the dry run and a real call render through one code path.",
+  "syntheticPhone": "+12025550142",
+  "scenarios": {
+    "inspection_confirmed": {
+      "label": "Caretaker accepts and gives an ETA",
+      "call": {
+        "id": "call_dry_confirmed",
+        "object": "call_task",
+        "status": "completed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": {
+          "inspection_accepted": "yes",
+          "estimated_arrival_minutes": "20",
+          "visible_distress": "unknown",
+          "veterinary_followup_requested": "no",
+          "caretaker_notes": "Animal was off her feed last night.",
+          "outcome": "inspection_confirmed",
+          "human_review_required": "no"
+        },
+        "summary": "Caretaker consented to the call, accepted the inspection, and expects to reach C-17 in about twenty minutes. Visible distress was not assessed because the caretaker had not yet seen the animal. No veterinary follow-up was requested.",
+        "taskCompleted": true,
+        "completionConfidence": {
+          "score": 0.93,
+          "label": "high"
+        },
+        "evidence": [
+          "Caretaker said \"Yeah, I can head over there\" when asked to inspect the animal.",
+          "Caretaker gave an estimate of about twenty minutes.",
+          "Caretaker said they could not judge distress without seeing the animal."
+        ],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": null,
+        "failureMessage": null,
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": "2026-04-12T05:46:10.000Z",
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "completed",
+            "structuredResult": null,
+            "summary": "Caretaker consented to the call, accepted the inspection, and expects to reach C-17 in about twenty minutes. Visible distress was not assessed because the caretaker had not yet seen the animal. No veterinary follow-up was requested.",
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "completed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": "2026-04-12T05:46:08.000Z",
+                "summary": "Caretaker consented to the call, accepted the inspection, and expects to reach C-17 in about twenty minutes. Visible distress was not assessed because the caretaker had not yet seen the animal. No veterinary follow-up was requested.",
+                "providerCallId": "prov_demo_1",
+                "failureCode": null,
+                "failureMessage": null,
+                "transcriptTurns": [
+                  {
+                    "offset_seconds": 2,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  },
+                  {
+                    "offset_seconds": 17,
+                    "speaker": "user",
+                    "text": "Yeah, go ahead, I'm just finishing up in the parlour."
+                  },
+                  {
+                    "offset_seconds": 20,
+                    "speaker": "bot",
+                    "text": "Thank you. This concerns animal C-17, in North Barn, Pen 4. A sensor recorded 46 breaths per minute against a normal range of 25 to 35, at 91 percent confidence, and the alert is marked high severity. The system reported elevated flank movement over 11 minutes of footage, with the animal standing apart from the group and its head held low. These readings are synthetic demonstration data, and I am not able to tell you what they mean."
+                  },
+                  {
+                    "offset_seconds": 44,
+                    "speaker": "bot",
+                    "text": "Can you inspect the animal?"
+                  },
+                  {
+                    "offset_seconds": 48,
+                    "speaker": "user",
+                    "text": "Yeah, I can head over there."
+                  },
+                  {
+                    "offset_seconds": 51,
+                    "speaker": "bot",
+                    "text": "How soon can you reach it?"
+                  },
+                  {
+                    "offset_seconds": 54,
+                    "speaker": "user",
+                    "text": "Give me about twenty minutes, I want to finish this row first."
+                  },
+                  {
+                    "offset_seconds": 59,
+                    "speaker": "bot",
+                    "text": "Are visible signs of distress present?"
+                  },
+                  {
+                    "offset_seconds": 62,
+                    "speaker": "user",
+                    "text": "I couldn't tell you, I'm not there yet. I'd have to see her."
+                  },
+                  {
+                    "offset_seconds": 67,
+                    "speaker": "bot",
+                    "text": "Is veterinary or supervisor follow-up requested?"
+                  },
+                  {
+                    "offset_seconds": 71,
+                    "speaker": "user",
+                    "text": "Not yet. Let me look at her first, and I'll ring the office if it's needed."
+                  },
+                  {
+                    "offset_seconds": 77,
+                    "speaker": "bot",
+                    "text": "Is there any additional observation?"
+                  },
+                  {
+                    "offset_seconds": 81,
+                    "speaker": "user",
+                    "text": "She was off her feed a bit last night, that's the only thing I noticed."
+                  },
+                  {
+                    "offset_seconds": 88,
+                    "speaker": "bot",
+                    "text": "Thank you. A person at the farm will review this and decide what happens next."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "followup_requested": {
+      "label": "Caretaker inspects and asks for the vet",
+      "call": {
+        "id": "call_dry_followup",
+        "object": "call_task",
+        "status": "completed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": {
+          "inspection_accepted": "yes",
+          "estimated_arrival_minutes": "10",
+          "visible_distress": "yes",
+          "veterinary_followup_requested": "yes",
+          "caretaker_notes": "Animal did not come up for feed this morning. Caretaker asked for the vet and for Marta to be told.",
+          "outcome": "followup_requested",
+          "human_review_required": "yes"
+        },
+        "summary": "Caretaker was already in the north barn, accepted the inspection, reported nostril flaring and hard flank movement, and asked for veterinary and supervisor follow-up. No one was contacted by the call.",
+        "taskCompleted": true,
+        "completionConfidence": {
+          "score": 0.9,
+          "label": "high"
+        },
+        "evidence": [
+          "Caretaker reported flaring nostrils and hard flank movement.",
+          "Caretaker said \"I want the vet on this one, and tell Marta as well\".",
+          "Caretaker was told the call cannot contact anyone."
+        ],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": null,
+        "failureMessage": null,
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": "2026-04-12T05:46:10.000Z",
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "completed",
+            "structuredResult": null,
+            "summary": "Caretaker was already in the north barn, accepted the inspection, reported nostril flaring and hard flank movement, and asked for veterinary and supervisor follow-up. No one was contacted by the call.",
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "completed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": "2026-04-12T05:46:08.000Z",
+                "summary": "Caretaker was already in the north barn, accepted the inspection, reported nostril flaring and hard flank movement, and asked for veterinary and supervisor follow-up. No one was contacted by the call.",
+                "providerCallId": "prov_demo_1",
+                "failureCode": null,
+                "failureMessage": null,
+                "transcriptTurns": [
+                  {
+                    "offset_seconds": 2,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  },
+                  {
+                    "offset_seconds": 15,
+                    "speaker": "user",
+                    "text": "Yes, go on."
+                  },
+                  {
+                    "offset_seconds": 18,
+                    "speaker": "bot",
+                    "text": "Thank you. This concerns animal C-17, in North Barn, Pen 4. A sensor recorded 46 breaths per minute against a normal range of 25 to 35, at 91 percent confidence, and the alert is marked high severity. The system reported elevated flank movement over 11 minutes of footage, with the animal standing apart from the group and its head held low. These readings are synthetic demonstration data, and I am not able to tell you what they mean."
+                  },
+                  {
+                    "offset_seconds": 42,
+                    "speaker": "bot",
+                    "text": "Can you inspect the animal?"
+                  },
+                  {
+                    "offset_seconds": 45,
+                    "speaker": "user",
+                    "text": "I'm actually in the north barn now, I can walk over."
+                  },
+                  {
+                    "offset_seconds": 49,
+                    "speaker": "bot",
+                    "text": "How soon can you reach it?"
+                  },
+                  {
+                    "offset_seconds": 52,
+                    "speaker": "user",
+                    "text": "Two minutes. Call it ten by the time I've had a proper look."
+                  },
+                  {
+                    "offset_seconds": 58,
+                    "speaker": "bot",
+                    "text": "Are visible signs of distress present?"
+                  },
+                  {
+                    "offset_seconds": 62,
+                    "speaker": "user",
+                    "text": "She's flaring at the nostrils and her sides are going hard. That's not right for her."
+                  },
+                  {
+                    "offset_seconds": 69,
+                    "speaker": "bot",
+                    "text": "Is veterinary or supervisor follow-up requested?"
+                  },
+                  {
+                    "offset_seconds": 73,
+                    "speaker": "user",
+                    "text": "Yes. I want the vet on this one, and tell Marta as well."
+                  },
+                  {
+                    "offset_seconds": 78,
+                    "speaker": "bot",
+                    "text": "Understood, I will record that you have asked for veterinary and supervisor follow-up. I am not able to contact anyone myself; a person at the farm will make that call."
+                  },
+                  {
+                    "offset_seconds": 88,
+                    "speaker": "bot",
+                    "text": "Is there any additional observation?"
+                  },
+                  {
+                    "offset_seconds": 92,
+                    "speaker": "user",
+                    "text": "She didn't come up for feed this morning either."
+                  },
+                  {
+                    "offset_seconds": 98,
+                    "speaker": "bot",
+                    "text": "Thank you. A person at the farm will review this and decide what happens next."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "declined": {
+      "label": "Caretaker cannot attend",
+      "call": {
+        "id": "call_dry_declined",
+        "object": "call_task",
+        "status": "completed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": {
+          "inspection_accepted": "no",
+          "estimated_arrival_minutes": "unknown",
+          "visible_distress": "unknown",
+          "veterinary_followup_requested": "no",
+          "caretaker_notes": "Caretaker is off site until the afternoon and asked that the office be told.",
+          "outcome": "declined",
+          "human_review_required": "yes"
+        },
+        "summary": "Caretaker is off site at the feed merchant and cannot inspect the animal before the afternoon. No distress assessment was possible and no veterinary follow-up was requested, but the caretaker asked that the office be told.",
+        "taskCompleted": true,
+        "completionConfidence": {
+          "score": 0.88,
+          "label": "high"
+        },
+        "evidence": [
+          "Caretaker said they are forty minutes away and back in the afternoon.",
+          "Caretaker asked that somebody in the office be told."
+        ],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": null,
+        "failureMessage": null,
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": "2026-04-12T05:46:10.000Z",
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "completed",
+            "structuredResult": null,
+            "summary": "Caretaker is off site at the feed merchant and cannot inspect the animal before the afternoon. No distress assessment was possible and no veterinary follow-up was requested, but the caretaker asked that the office be told.",
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "completed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": "2026-04-12T05:46:08.000Z",
+                "summary": "Caretaker is off site at the feed merchant and cannot inspect the animal before the afternoon. No distress assessment was possible and no veterinary follow-up was requested, but the caretaker asked that the office be told.",
+                "providerCallId": "prov_demo_1",
+                "failureCode": null,
+                "failureMessage": null,
+                "transcriptTurns": [
+                  {
+                    "offset_seconds": 2,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  },
+                  {
+                    "offset_seconds": 16,
+                    "speaker": "user",
+                    "text": "Go ahead, but I'll tell you now I'm not on site."
+                  },
+                  {
+                    "offset_seconds": 20,
+                    "speaker": "bot",
+                    "text": "Thank you. This concerns animal C-17, in North Barn, Pen 4. A sensor recorded 46 breaths per minute against a normal range of 25 to 35, at 91 percent confidence, and the alert is marked high severity. The system reported elevated flank movement over 11 minutes of footage, with the animal standing apart from the group and its head held low. These readings are synthetic demonstration data, and I am not able to tell you what they mean."
+                  },
+                  {
+                    "offset_seconds": 44,
+                    "speaker": "bot",
+                    "text": "Can you inspect the animal?"
+                  },
+                  {
+                    "offset_seconds": 47,
+                    "speaker": "user",
+                    "text": "No, I can't. I'm forty minutes away at the feed merchant and I won't be back until the afternoon."
+                  },
+                  {
+                    "offset_seconds": 55,
+                    "speaker": "bot",
+                    "text": "Thank you. How soon can you reach it?"
+                  },
+                  {
+                    "offset_seconds": 59,
+                    "speaker": "user",
+                    "text": "Not today, not before three anyway."
+                  },
+                  {
+                    "offset_seconds": 63,
+                    "speaker": "bot",
+                    "text": "Are visible signs of distress present?"
+                  },
+                  {
+                    "offset_seconds": 66,
+                    "speaker": "user",
+                    "text": "No idea, I can't see her."
+                  },
+                  {
+                    "offset_seconds": 70,
+                    "speaker": "bot",
+                    "text": "Is veterinary or supervisor follow-up requested?"
+                  },
+                  {
+                    "offset_seconds": 74,
+                    "speaker": "user",
+                    "text": "No, but somebody in the office needs to know, because I can't get to her."
+                  },
+                  {
+                    "offset_seconds": 80,
+                    "speaker": "bot",
+                    "text": "Is there any additional observation?"
+                  },
+                  {
+                    "offset_seconds": 83,
+                    "speaker": "user",
+                    "text": "No, nothing from me."
+                  },
+                  {
+                    "offset_seconds": 87,
+                    "speaker": "bot",
+                    "text": "Thank you. A person at the farm will review this and decide what happens next."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "unanswered": {
+      "label": "Nobody picked up",
+      "call": {
+        "id": "call_dry_unanswered",
+        "object": "call_task",
+        "status": "failed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": null,
+        "summary": null,
+        "taskCompleted": false,
+        "completionConfidence": null,
+        "evidence": [],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": "no_answer",
+        "failureMessage": "calling task status=NO_ANSWER (ring timeout 45s)",
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": null,
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "failed",
+            "structuredResult": null,
+            "summary": null,
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "failed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": null,
+                "summary": null,
+                "providerCallId": "prov_demo_1",
+                "failureCode": "no_answer",
+                "failureMessage": "calling task status=NO_ANSWER (ring timeout 45s)",
+                "transcriptTurns": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "voicemail": {
+      "label": "Answering machine",
+      "call": {
+        "id": "call_dry_voicemail",
+        "object": "call_task",
+        "status": "failed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": null,
+        "summary": null,
+        "taskCompleted": false,
+        "completionConfidence": null,
+        "evidence": [],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": "call_failed",
+        "failureMessage": "calling task status=VOICEMAIL (machine detected)",
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": null,
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "failed",
+            "structuredResult": null,
+            "summary": null,
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "failed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": null,
+                "summary": null,
+                "providerCallId": "prov_demo_1",
+                "failureCode": "call_failed",
+                "failureMessage": "calling task status=VOICEMAIL (machine detected)",
+                "transcriptTurns": [
+                  {
+                    "offset_seconds": 2,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "contradictory": {
+      "label": "Unclear answers, contradictory result",
+      "call": {
+        "id": "call_dry_contradictory",
+        "object": "call_task",
+        "status": "completed",
+        "task": "See lib/calle.ts buildTask(). Stored out of the fixture so the brief has exactly one source.",
+        "structuredResult": {
+          "inspection_accepted": "unclear",
+          "estimated_arrival_minutes": "15",
+          "visible_distress": "yes",
+          "veterinary_followup_requested": "unclear",
+          "caretaker_notes": "Caretaker said the animal looked rough earlier but would not commit to attending, and ended the call.",
+          "outcome": "inspection_confirmed",
+          "human_review_required": "no"
+        },
+        "summary": "The caretaker gave hedged answers, did not commit to inspecting the animal, and ended the call early. The provider nonetheless reported the inspection as confirmed.",
+        "taskCompleted": true,
+        "completionConfidence": {
+          "score": 0.42,
+          "label": "low"
+        },
+        "evidence": [
+          "Caretaker said \"somebody will get to her at some point\".",
+          "Caretaker said \"I'm not promising\" about the fifteen-minute estimate."
+        ],
+        "metadata": {
+          "app": "herdrelay",
+          "synthetic": true
+        },
+        "failureCode": null,
+        "failureMessage": null,
+        "createdAt": "2026-04-12T05:44:00.000Z",
+        "completedAt": "2026-04-12T05:46:10.000Z",
+        "recipients": [
+          {
+            "id": "rcp_demo_caretaker",
+            "phones": [
+              "+12025550142"
+            ],
+            "locale": "en",
+            "region": "US",
+            "status": "completed",
+            "structuredResult": null,
+            "summary": "The caretaker gave hedged answers, did not commit to inspecting the animal, and ended the call early. The provider nonetheless reported the inspection as confirmed.",
+            "attempts": [
+              {
+                "id": "att_demo_1",
+                "phone": "+12025550142",
+                "status": "completed",
+                "startedAt": "2026-04-12T05:44:06.000Z",
+                "completedAt": "2026-04-12T05:46:08.000Z",
+                "summary": "The caretaker gave hedged answers, did not commit to inspecting the animal, and ended the call early. The provider nonetheless reported the inspection as confirmed.",
+                "providerCallId": "prov_demo_1",
+                "failureCode": null,
+                "failureMessage": null,
+                "transcriptTurns": [
+                  {
+                    "offset_seconds": 2,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  },
+                  {
+                    "offset_seconds": 18,
+                    "speaker": "user",
+                    "text": "Who is this? Sorry, the line's terrible."
+                  },
+                  {
+                    "offset_seconds": 22,
+                    "speaker": "bot",
+                    "text": "Hello, this is an automated AI assistant calling on behalf of Ridgeline Dairy. I am an AI-assisted livestock-monitoring demonstration, not a person and not a veterinarian. A barn sensor flagged a possible breathing irregularity from synthetic demonstration data, and I have a few short questions so a person can decide what to do. Nothing I say is a diagnosis. Is now a good time?"
+                  },
+                  {
+                    "offset_seconds": 38,
+                    "speaker": "user",
+                    "text": "Right. Right."
+                  },
+                  {
+                    "offset_seconds": 41,
+                    "speaker": "bot",
+                    "text": "Thank you. This concerns animal C-17, in North Barn, Pen 4. A sensor recorded 46 breaths per minute against a normal range of 25 to 35, at 91 percent confidence, and the alert is marked high severity. The system reported elevated flank movement over 11 minutes of footage, with the animal standing apart from the group and its head held low. These readings are synthetic demonstration data, and I am not able to tell you what they mean."
+                  },
+                  {
+                    "offset_seconds": 64,
+                    "speaker": "bot",
+                    "text": "Can you inspect the animal?"
+                  },
+                  {
+                    "offset_seconds": 68,
+                    "speaker": "user",
+                    "text": "I mean, somebody will get to her at some point."
+                  },
+                  {
+                    "offset_seconds": 73,
+                    "speaker": "bot",
+                    "text": "Sorry, to be clear: can you inspect the animal yourself?"
+                  },
+                  {
+                    "offset_seconds": 78,
+                    "speaker": "user",
+                    "text": "[inaudible] ...depends what else is on."
+                  },
+                  {
+                    "offset_seconds": 83,
+                    "speaker": "bot",
+                    "text": "How soon can you reach it?"
+                  },
+                  {
+                    "offset_seconds": 86,
+                    "speaker": "user",
+                    "text": "Fifteen minutes, maybe. I'm not promising."
+                  },
+                  {
+                    "offset_seconds": 91,
+                    "speaker": "bot",
+                    "text": "Are visible signs of distress present?"
+                  },
+                  {
+                    "offset_seconds": 94,
+                    "speaker": "user",
+                    "text": "She looked rough earlier, I'd say she's struggling."
+                  },
+                  {
+                    "offset_seconds": 99,
+                    "speaker": "bot",
+                    "text": "Is veterinary or supervisor follow-up requested?"
+                  },
+                  {
+                    "offset_seconds": 103,
+                    "speaker": "user",
+                    "text": "That's not my call, is it."
+                  },
+                  {
+                    "offset_seconds": 108,
+                    "speaker": "bot",
+                    "text": "Is there any additional observation?"
+                  },
+                  {
+                    "offset_seconds": 111,
+                    "speaker": "user",
+                    "text": "No. Look, I have to go."
+                  },
+                  {
+                    "offset_seconds": 114,
+                    "speaker": "bot",
+                    "text": "Thank you. A person at the farm will review this and decide what happens next."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

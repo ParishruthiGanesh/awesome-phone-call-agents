@@ -1,0 +1,57 @@
+{
+  "note": "SYNTHETIC. Every alert in this file was hand-authored for a demonstration. No camera, collar, or barn sensor produced any of these readings, and HerdRelay ships no code path that ingests real animal data. The animals, pens, and site are fictional.",
+  "alerts": [
+    {
+      "id": "alert_c17_0412",
+      "animalId": "C-17",
+      "location": "North Barn, Pen 4",
+      "detectedAt": "2026-04-12T05:42:00.000Z",
+      "sensorId": "cam-north-04",
+      "observedRespiratoryRate": 46,
+      "baselineRange": { "min": 25, "max": 35 },
+      "confidence": 0.91,
+      "severity": "high",
+      "evidenceSummary": "Elevated flank movement over 11 minutes of continuous footage, with the animal standing apart from the group and head held low.",
+      "synthetic": true
+    },
+    {
+      "id": "alert_b04_0412",
+      "animalId": "B-04",
+      "location": "South Barn, Pen 1",
+      "detectedAt": "2026-04-12T04:58:00.000Z",
+      "sensorId": "cam-south-01",
+      "observedRespiratoryRate": 38,
+      "baselineRange": { "min": 25, "max": 35 },
+      "confidence": 0.64,
+      "severity": "moderate",
+      "evidenceSummary": "Breathing rate above range across two short clips, separated by a period within range. Partial occlusion by a feed rail for much of the window.",
+      "synthetic": true
+    },
+    {
+      "id": "alert_d22_0411",
+      "animalId": "D-22",
+      "location": "West Paddock Shelter",
+      "detectedAt": "2026-04-11T21:15:00.000Z",
+      "sensorId": "collar-d22",
+      "observedRespiratoryRate": 52,
+      "baselineRange": { "min": 26, "max": 36 },
+      "confidence": 0.88,
+      "severity": "high",
+      "evidenceSummary": "Sustained elevation for 19 minutes after the herd settled, with reduced movement compared with the animal's own overnight baseline.",
+      "synthetic": true
+    },
+    {
+      "id": "alert_a09_0411",
+      "animalId": "A-09",
+      "location": "North Barn, Pen 2",
+      "detectedAt": "2026-04-11T14:03:00.000Z",
+      "sensorId": "cam-north-02",
+      "observedRespiratoryRate": 33,
+      "baselineRange": { "min": 25, "max": 35 },
+      "confidence": 0.41,
+      "severity": "low",
+      "evidenceSummary": "Brief rate spike during a feed push, returning to range within four minutes. Consistent with routine activity rather than an incident.",
+      "synthetic": true
+    }
+  ]
+}

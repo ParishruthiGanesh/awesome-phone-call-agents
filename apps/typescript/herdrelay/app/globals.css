@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  /* An operations console at 5am in a barn office: dark, low glare, high contrast. */
+  --color-ink: #0a0c0f;
+  --color-panel: #11161b;
+  --color-panel-soft: #161c22;
+  --color-line: #232c35;
+  --color-line-soft: #1a222a;
+  --color-fog: #8d9aa8;
+  --color-fog-dim: #63707d;
+  --color-chalk: #e9eef4;
+
+  /* Alert bands. Contrast checked against --color-ink and --color-panel. */
+  --color-green: #5fd39a;
+  --color-green-dim: #1d3d31;
+  --color-amber: #e8b45c;
+  --color-amber-dim: #43351a;
+  --color-red: #f0756b;
+  --color-red-dim: #45231f;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Menlo", monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-chalk);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The small-caps rail used for every field label in the console. */
+.rail {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-fog-dim);
+}
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+.dot-live {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-live {
+    animation: none;
+  }
+}
