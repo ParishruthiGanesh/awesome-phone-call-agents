@@ -32,6 +32,20 @@ export class NotDialable extends Error {}
  * reserved fictional number; in live mode it is the one configured caretaker,
  * and every missing piece of that configuration is a refusal.
  */
+/** A destination the recipient supplied and consented to, rather than a configured one. */
+export function consentedContext(
+  resolved: Destination,
+  caretakerName: string,
+  env: Env = process.env,
+): PreviewContext {
+  return {
+    mode: env.HERDRELAY_MODE === "live" ? "live" : "dry_run",
+    destination: resolved,
+    caretakerName,
+    siteName: env.HERDRELAY_SITE_NAME?.trim() || "Ridgeline Dairy",
+  };
+}
+
 export function previewContext(env: Env = process.env): PreviewContext {
   if (env.HERDRELAY_MODE !== "live") {
     return {

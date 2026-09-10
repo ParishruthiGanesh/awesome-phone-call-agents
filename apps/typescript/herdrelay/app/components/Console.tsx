@@ -6,6 +6,7 @@ import { AlertDetail } from "./AlertDetail";
 import { AlertsTable, type AlertRow } from "./AlertsTable";
 import { CallMonitor } from "./CallMonitor";
 import { CallPreviewPanel } from "./CallPreviewPanel";
+import { ConsentForm, type SelfServiceState } from "./ConsentForm";
 import { ResultPanel } from "./ResultPanel";
 import { Timeline } from "./Timeline";
 import { Button, Notice, Panel, Pill, Rail, Stat } from "./ui";
@@ -13,6 +14,7 @@ import { Button, Notice, Panel, Pill, Rail, Stat } from "./ui";
 type ConsoleState = {
   mode: CallMode;
   operator: { name: string; shared: boolean };
+  selfService: SelfServiceState;
   liveReady: boolean;
   liveBlockedReason: string | null;
   dryRunScenario: string | null;
@@ -112,11 +114,11 @@ export function Console() {
     }
   }, []);
 
-  const prepare = (alert: AlertRow) =>
+  const prepare = (alert: AlertRow, consented?: { phone: string; name: string; consent: true }) =>
     act(async () => {
       const body = await api<{ incident: Incident; preview: CallPreview }>("/api/incidents", {
         method: "POST",
-        body: JSON.stringify({ alertId: alert.id, scenario }),
+        body: JSON.stringify({ alertId: alert.id, scenario, ...(consented ?? {}) }),
       });
       setIncident(body.incident);
       setPreview(body.preview);
@@ -306,13 +308,25 @@ export function Console() {
                       </select>
                     </label>
                   ) : null}
-                  <Button onClick={() => prepare(selected)} disabled={busy || (live && !state?.liveReady)}>
-                    Prepare call task
-                  </Button>
-                  <p className="text-xs text-fog-dim">
-                    Preparing builds the task and the preview. It places no call.
-                  </p>
+                  {state?.selfService.enabled ? null : (
+                    <>
+                      <Button onClick={() => prepare(selected)} disabled={busy || (live && !state?.liveReady)}>
+                        Prepare call task
+                      </Button>
+                      <p className="text-xs text-fog-dim">
+                        Preparing builds the task and the preview. It places no call.
+                      </p>
+                    </>
+                  )}
                 </div>
+              ) : null}
+              {!incident && state?.selfService.enabled ? (
+                <ConsentForm
+                  selfService={state.selfService}
+                  busy={busy}
+                  disabled={live && !state.liveReady}
+                  onSubmit={(input) => prepare(selected, input)}
+                />
               ) : null}
             </Panel>
           ) : (

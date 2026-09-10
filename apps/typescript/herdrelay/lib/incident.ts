@@ -16,10 +16,22 @@ import { hasCaretakerSpeech, normalizeCall } from "./call-record";
 import { coordinationStatus, incidentPhase } from "./coordination";
 import { DryRunProviderFailure, loadScenario, simulateProgress, SIMULATED_DURATION_MS } from "./dry-run";
 import { callMode, dryRunScenario, isDryRunScenario } from "./mode";
+import { destination } from "./phone";
 import type { Operator } from "./operators";
-import { buildPreview, NotDialable, previewContext, type PreviewContext } from "./preview";
+import { buildPreview, consentedContext, NotDialable, previewContext, type PreviewContext } from "./preview";
 import { logSafe, redact } from "./redact";
 import { validateResult } from "./result";
+import {
+  acceptConsent,
+  clearPendingDestination,
+  isSelfService,
+  readPendingDestination,
+  numberAlreadyCalled,
+  recordCallPlaced,
+  SelfServiceRefusal,
+  storePendingDestination,
+  type ConsentRequest,
+} from "./self-service";
 import {
   appendTimeline,
   findOpenIncidentForAlert,
@@ -32,7 +44,7 @@ import {
   updateIncident,
   withIncidentLock,
 } from "./store";
-import type { CallPreview, CallRecord, Incident, TimelineEntry, Env } from "./types";
+import type { CallPreview, CallRecord, Incident, TimelineEntry } from "./types";
 
 export class WorkflowError extends Error {
   constructor(
@@ -56,7 +68,11 @@ export const AMBIGUOUS_MESSAGE =
 // Preparing
 // ---------------------------------------------------------------------------
 
-export async function prepareIncident(alertId: string, requestedScenario?: string): Promise<Incident> {
+export async function prepareIncident(
+  alertId: string,
+  requestedScenario?: string,
+  consentRequest?: ConsentRequest,
+): Promise<Incident> {
   const alert = await findAlert(alertId);
   if (!alert) throw new WorkflowError("Unknown alert.", 404);
 
@@ -69,6 +85,14 @@ export async function prepareIncident(alertId: string, requestedScenario?: strin
       open.id,
     );
   }
+
+  // Self-service takes the destination from the person who will be called, and
+  // only with their stated consent. Every guard runs before an incident exists.
+  const accepted = isSelfService()
+    ? await acceptConsent(
+        consentRequest ?? { phone: undefined, consent: undefined, visitor: "unknown-visitor" },
+      )
+    : null;
 
   const mode = callMode();
   const incident: Incident = {
@@ -88,6 +112,14 @@ export async function prepareIncident(alertId: string, requestedScenario?: strin
     call: null,
     createState: null,
     reservationKey: null,
+    consent: accepted
+      ? {
+          consentedAt: accepted.consentedAt,
+          recipientMasked: accepted.destination.masked,
+          visitorFingerprint: accepted.visitorFingerprint,
+          statement: CONSENT_STATEMENT,
+        }
+      : null,
     validated: null,
     coordinationStatus: null,
     humanReviewRequired: true,
@@ -100,17 +132,49 @@ export async function prepareIncident(alertId: string, requestedScenario?: strin
       {
         at: new Date().toISOString(),
         step: "call_prepared",
-        detail: "Call task prepared. Nothing has been dialed; approval is required.",
+        detail: accepted
+          ? `Recipient ${accepted.destination.masked} confirmed the number is their own and agreed to one automated call. Nothing has been dialed; approval is required.`
+          : "Call task prepared. Nothing has been dialed; approval is required.",
       },
     ],
   };
-  return saveIncident(incident);
+
+  const saved = await saveIncident(incident);
+  // The number is written outside the incident record, and erased when the call
+  // is over, so no stored incident can be used to redial.
+  if (accepted) {
+    await storePendingDestination(saved.id, {
+      phone: accepted.destination.phone,
+      caretakerName: accepted.caretakerName,
+    });
+  }
+  return saved;
+}
+
+export const CONSENT_STATEMENT =
+  "This is my own phone number and I agree to receive one automated AI call from this demonstration.";
+
+/**
+ * The destination for one incident.
+ *
+ * In self-service mode it is the number the recipient supplied and consented
+ * to; otherwise it is the single configured caretaker. Either way it is
+ * resolved server-side and never taken from the request that places the call.
+ */
+export async function contextFor(incident: Incident): Promise<PreviewContext> {
+  if (!incident.consent) return previewContext();
+  const pending = await readPendingDestination(incident.id);
+  if (!pending) {
+    throw new NotDialable(
+      "The consented number for this incident is no longer held, so it cannot be called. Start a new one.",
+    );
+  }
+  return consentedContext(destination(pending.phone), pending.caretakerName);
 }
 
 /** The preview as it stands right now, for this incident and this configuration. */
-export function previewFor(incident: Incident, env: Env = process.env): CallPreview {
-  const context = previewContext(env);
-  return buildPreview(incident.id, incident.alert, context);
+export async function previewFor(incident: Incident): Promise<CallPreview> {
+  return buildPreview(incident.id, incident.alert, await contextFor(incident));
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +199,7 @@ export async function approveIncident(
     if (incident.callId || incident.createState) {
       throw new WorkflowError("This incident already has a call. It cannot be approved again.", 409);
     }
-    const preview = previewFor(incident);
+    const preview = await previewFor(incident);
     if (preview.fingerprint !== fingerprint) {
       throw new WorkflowError(
         "The call changed since it was previewed. Review the new preview and approve that instead.",
@@ -196,7 +260,7 @@ export async function placeCall(id: string, operator: Operator): Promise<Inciden
 
     let context: PreviewContext;
     try {
-      context = previewContext();
+      context = await contextFor(incident);
     } catch (error) {
       throw new WorkflowError(
         error instanceof NotDialable ? error.message : "The call destination is not configured.",
@@ -213,6 +277,16 @@ export async function placeCall(id: string, operator: Operator): Promise<Inciden
     }
     if (context.mode !== approval.mode) {
       throw new WorkflowError("The call mode changed after approval. Approve the current preview instead.", 409);
+    }
+
+    // Checked again here, immediately before dialing: the check at prepare time
+    // cannot see an incident that was prepared alongside this one and dialed
+    // first. This is the one that actually holds.
+    if (incident.consent && (await numberAlreadyCalled(context.destination.phone))) {
+      throw new WorkflowError(
+        "This demo calls any given number once only, and that number has already been called.",
+        409,
+      );
     }
 
     return context.mode === "dry_run"
@@ -253,6 +327,8 @@ async function startDryRun(incident: Incident, context: PreviewContext): Promise
     createdAt: startedAt,
   };
 
+  if (incident.consent) await recordCallPlaced(phone);
+
   const started = await saveIncident({
     ...incident,
     callId: record.callId,
@@ -291,6 +367,9 @@ async function startLiveCall(incident: Incident, context: PreviewContext): Promi
       { idempotencyKey: `herdrelay:${incident.id}` },
     );
     verifyCall(call, incident, phone);
+    // Spent on acceptance, not on completion: a call that connected and then
+    // failed has still rung that phone once.
+    if (incident.consent) await recordCallPlaced(phone);
     const record = normalizeCall(call);
     const started = await saveIncident({
       ...incident,
@@ -390,7 +469,7 @@ async function readDryRunCall(incident: Incident): Promise<CallRecord> {
 async function readLiveCall(incident: Incident): Promise<CallRecord> {
   try {
     const call = await calleClient().calls.get(incident.callId!);
-    const context = previewContext();
+    const context = await contextFor(incident);
     verifyCall(call, incident, context.destination.phone, incident.callId!);
     return normalizeCall(call);
   } catch (error) {
@@ -455,6 +534,9 @@ export async function finalize(incident: Incident, record: CallRecord): Promise<
   if (terminal && saved.reservationKey) {
     await releaseDestination(saved.reservationKey, incident.id);
   }
+  // A consented number is needed only while the call is running. The result,
+  // the transcript and the record are all readable without it.
+  if (terminal && saved.consent) await clearPendingDestination(saved.id);
   return saved;
 }
 
@@ -479,7 +561,7 @@ export async function reconcileIncident(id: string, callId: string): Promise<Inc
     }
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(callId)) throw new WorkflowError("Invalid CALL-E call ID.", 400);
 
-    const context = previewContext();
+    const context = await contextFor(incident);
     const call = await calleClient().calls.get(callId); // Read only; never creates.
     verifyCall(call, incident, context.destination.phone, callId);
     const record = normalizeCall(call);
@@ -525,6 +607,9 @@ export function workflowError(error: unknown): {
       ambiguous: true,
       blockingIncidentId: error.blockingIncidentId,
     };
+  }
+  if (error instanceof SelfServiceRefusal) {
+    return { error: redact(error.message), status: error.status, ambiguous: false };
   }
   if (error instanceof NotDialable) {
     return { error: redact(error.message), status: 503, ambiguous: false };

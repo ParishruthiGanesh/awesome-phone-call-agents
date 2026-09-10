@@ -3,6 +3,7 @@ import { loadAlerts, warrantsCall } from "@/lib/alerts";
 import { requireOperator } from "@/lib/auth";
 import { scenarioLabels } from "@/lib/dry-run";
 import { callMode, dryRunScenario, liveReadiness } from "@/lib/mode";
+import { callsToday, dailyCap, isSelfService } from "@/lib/self-service";
 import { listIncidents } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -20,6 +21,9 @@ export async function GET(request: Request) {
   return NextResponse.json({
     mode,
     operator: { name: operator.name, shared: operator.shared },
+    selfService: isSelfService()
+      ? { enabled: true, dailyCap: dailyCap(), remainingToday: Math.max(dailyCap() - (await callsToday()), 0) }
+      : { enabled: false, dailyCap: 0, remainingToday: 0 },
     // Never the number itself, and never the credential: only whether the
     // configuration is complete enough to dial.
     liveReady: readiness.ready,

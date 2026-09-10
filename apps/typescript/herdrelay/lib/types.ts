@@ -186,6 +186,20 @@ export type Approval = {
   expiresAt: string;
 };
 
+/**
+ * Proof that the person who was called asked to be.
+ *
+ * Only present in self-service demo mode. The number is deliberately absent —
+ * only its masked form — so the incident record still cannot be used to redial.
+ */
+export type ConsentRecord = {
+  consentedAt: string;
+  recipientMasked: string;
+  /** Hashed visitor identifier, for rate limiting. Never a raw address. */
+  visitorFingerprint: string;
+  statement: string;
+};
+
 export type TimelineEntry = {
   at: string;
   /** Machine-readable step, used for the timeline rail. */
@@ -222,6 +236,8 @@ export type Incident = {
    * never a number.
    */
   reservationKey: string | null;
+  /** Present when the recipient supplied their own number and consented. */
+  consent: ConsentRecord | null;
   validated: ValidatedResult | null;
   coordinationStatus: CoordinationStatus | null;
   humanReviewRequired: boolean;

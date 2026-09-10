@@ -130,10 +130,11 @@ apps/typescript/herdrelay/
 │   ├── preview.ts               The approved object and its fingerprint
 │   ├── redact.ts                Masking for logs and errors
 │   ├── result.ts                Structured-result validation, fail closed
+│   ├── self-service.ts          Consent, caps and per-number limits for a public demo
 │   └── store.ts                 Incident files, locks, destination reservations
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       94 tests, no credentials, no calls
+├── tests/                       108 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -251,6 +252,9 @@ The dashboard runs in dry run with no configuration, no credentials, and no `.en
 | `HERDRELAY_AUTH_TOKEN` | fallback | Single shared login (`herdrelay` / this token), 32+ characters. Superseded by named accounts. |
 | `HERDRELAY_OPERATORS_FILE` | no | Where operator accounts live. Defaults to `./operators.json`, which is gitignored. |
 | `HERDRELAY_ORIGIN` | no | Exact browser origin. Unset uses the request's own `Host`, so any local port works. |
+| `HERDRELAY_SELF_SERVICE` | no | `true` lets the recipient supply and consent to their own number. Off otherwise. |
+| `HERDRELAY_DAILY_CALL_CAP` | no | Calls a day across the deployment in self-service mode. Default 5. |
+| `HERDRELAY_VISITOR_ATTEMPTS` | no | Attempts an hour per visitor in self-service mode. Default 3. |
 | `HERDRELAY_DATA_DIR` | no | Where incident files go. Defaults to `./data`, which is gitignored. |
 
 Live mode refuses to start a call unless **all** of the live-only variables are set, and unless there
@@ -362,6 +366,32 @@ connection is genuinely unknown, so HerdRelay **does not retry**, even with an i
 incident halts, the caretaker stays reserved, and you reconcile it against the CALL-E dashboard
 before anything else happens. Anything HerdRelay does not recognise is treated as unknown.
 
+## Self-service demo mode
+
+Off unless `HERDRELAY_SELF_SERVICE=true`. Normally HerdRelay dials one number
+configured on the server, which is the right shape for a farm: the caretaker agreed in advance and
+the browser can never steer the call elsewhere.
+
+A public demonstration needs the opposite — the person trying it wants their *own* phone to ring.
+That is a genuinely more dangerous shape, because a public page that dials a number a stranger typed
+is an open dialer. Self-service mode is that shape, bounded:
+
+| Lock | What it does |
+| --- | --- |
+| **Consent statement** | The number arrives with an explicit "this is my own phone and I agree to receive one automated AI call". Nothing is prepared, reserved or dialed without it, and the statement is stored on the incident with a timestamp. |
+| **One call per number, ever** | A number this deployment has rung can never be rung again. Checked when the number is offered *and* again immediately before dialing, because two incidents can be prepared before either dials. |
+| **Daily cap** | At most `HERDRELAY_DAILY_CALL_CAP` calls a day across everybody, default 5. An unusable value falls back to the default rather than to no cap. |
+| **Per-visitor attempts** | At most `HERDRELAY_VISITOR_ATTEMPTS` attempts an hour from one visitor, default 3, counted before the other checks so a refused attempt still costs the visitor. |
+| **Sign-in still required** | The console is not open. Use a named account, or a shared password published alongside the demo. |
+| **The number stays off the record** | It is written to a separate file, never into the incident, and erased when the call ends. The result, transcript and record all read fine without it. |
+
+The budgets are spent when the provider *accepts* the call, not when it completes: a call that
+connected and then failed has still rung that phone once.
+
+None of this makes an open dialer safe. It makes a supervised demonstration bounded, and it is not
+something to leave running unattended. For an unattended public URL, run dry run instead — it needs
+no credentials, rings nothing, and demonstrates the same workflow through the same code path.
+
 ## Safety and consent
 
 | Protection | Where it lives |
@@ -388,6 +418,10 @@ before anything else happens. Anything HerdRelay does not recognise is treated a
 | The brief refuses diagnosis, treatment, escalation and promises | `lib/calle.ts` |
 | Unclear answers stay unclear; contradictions fail closed | `lib/result.ts` |
 | Live mode requires a signed-in operator | `lib/access.ts` |
+| Caller-supplied numbers are refused outright unless self-service mode is on | `lib/self-service.ts` |
+| A self-service call needs a recorded consent statement from the recipient | `lib/self-service.ts` |
+| One call per number ever, checked again at the moment of dialing | `lib/self-service.ts`, `lib/incident.ts` |
+| Daily and per-visitor caps bound how much a public demo can be abused | `lib/self-service.ts` |
 | Approvals record the name of the person who made them | `lib/operators.ts`, `lib/incident.ts` |
 | Passwords are scrypt-hashed with a per-account salt, never stored or recoverable | `lib/operators.ts` |
 | A wrong password and an unknown account are indistinguishable | `lib/access.ts`, `lib/operators.ts` |
@@ -403,7 +437,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 94 tests
+npm test        # 108 tests
 npm run check   # typecheck + tests
 ```
 
@@ -602,7 +636,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 94, no credentials and no calls.
+Tests: 108, no credentials and no calls.
 ```
 
 ---

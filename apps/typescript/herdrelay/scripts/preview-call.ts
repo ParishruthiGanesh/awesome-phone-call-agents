@@ -47,7 +47,7 @@ async function main(): Promise<void> {
 
   const mode = callMode();
   const incident = await prepareIncident(alert.id);
-  const preview = previewFor(incident);
+  const preview = await previewFor(incident);
 
   console.log(`Mode:        ${mode}`);
   console.log(`Alert:       ${alert.animalId} at ${alert.location} (SYNTHETIC data)`);

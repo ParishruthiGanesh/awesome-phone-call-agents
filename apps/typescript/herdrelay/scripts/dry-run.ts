@@ -64,7 +64,7 @@ async function main(): Promise<void> {
   line("Data", "SYNTHETIC — generated for this demonstration");
 
   const prepared = await prepareIncident(alert.id, scenario);
-  const preview = previewFor(prepared);
+  const preview = await previewFor(prepared);
 
   console.log("\n--- Call preview (what an operator approves) ---\n");
   line("Mode", preview.mode);

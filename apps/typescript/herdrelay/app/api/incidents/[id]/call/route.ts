@@ -17,7 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params;
   try {
     const incident = await placeCall(id, operator);
-    return NextResponse.json({ incident, preview: previewFor(incident) });
+    return NextResponse.json({ incident, preview: await previewFor(incident) });
   } catch (error) {
     const { status, ...body } = workflowError(error);
     return NextResponse.json(body, { status });

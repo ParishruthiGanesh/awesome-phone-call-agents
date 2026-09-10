@@ -13,7 +13,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const incident = await getIncident(id);
     if (!incident) return NextResponse.json({ error: "Unknown incident." }, { status: 404 });
-    return NextResponse.json({ incident, preview: previewFor(incident) }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ incident, preview: await previewFor(incident) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const { status, ...body } = workflowError(error);
     return NextResponse.json(body, { status });

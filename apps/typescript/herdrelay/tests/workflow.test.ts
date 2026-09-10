@@ -50,7 +50,7 @@ async function fastForward(incident: Incident): Promise<Incident> {
 
 async function approvedIncident(scenario = "inspection_confirmed"): Promise<Incident> {
   const prepared = await prepareIncident(ALERT, scenario);
-  const preview = previewFor(prepared);
+  const preview = await previewFor(prepared);
   const { incident } = await approveIncident(prepared.id, preview.fingerprint, OPERATOR);
   return incident;
 }
@@ -187,7 +187,7 @@ test("a finished call frees the caretaker, so the next animal can be called abou
   assert.equal(await readReservation(CARETAKER), null);
 
   const second = await prepareIncident("alert_d22_0411");
-  const preview = previewFor(second);
+  const preview = await previewFor(second);
   await approveIncident(second.id, preview.fingerprint, OPERATOR);
   const placed = await placeCall(second.id, OPERATOR);
   assert.equal(placed.phase, "calling");
@@ -202,7 +202,7 @@ test("a reservation left behind by a finished incident is debris, and is taken o
   assert.equal(isFinished(revived!), true);
 
   const next = await prepareIncident("alert_d22_0411");
-  const preview = previewFor(next);
+  const preview = await previewFor(next);
   await approveIncident(next.id, preview.fingerprint, OPERATOR);
   await assert.doesNotReject(() => placeCall(next.id, OPERATOR));
 });
@@ -222,7 +222,7 @@ test("a blocked call names the incident holding the caretaker", async () => {
   await placeCall(blocker.id, OPERATOR).catch(() => undefined);
 
   const other = await prepareIncident("alert_d22_0411");
-  const preview = previewFor(other);
+  const preview = await previewFor(other);
   await approveIncident(other.id, preview.fingerprint, OPERATOR);
   await assert.rejects(() => placeCall(other.id, OPERATOR), (error: IncidentConflict) => {
     assert.match(error.message, /unresolved call for animal C-17/);
@@ -240,7 +240,7 @@ test("a call still in flight holds the caretaker, whatever the animal", async ()
   await placeCall(approved.id, OPERATOR); // in flight, not finished
   // A different alert, the same caretaker: the reservation is on the person.
   const other = await prepareIncident("alert_d22_0411");
-  const preview = previewFor(other);
+  const preview = await previewFor(other);
   await approveIncident(other.id, preview.fingerprint, OPERATOR);
   await assert.rejects(() => placeCall(other.id, OPERATOR), /unresolved call for animal C-17/);
 });
