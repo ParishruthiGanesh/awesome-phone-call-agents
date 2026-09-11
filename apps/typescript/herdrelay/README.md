@@ -135,7 +135,7 @@ apps/typescript/herdrelay/
 ├── fixtures/                    Synthetic alerts and scripted CALL-E responses
 ├── render.yaml                  Deploy blueprint, safe defaults only
 ├── scripts/                     dry-run, preview-call, reset-demo, operators
-├── tests/                       113 tests, no credentials, no calls
+├── tests/                       115 tests, no credentials, no calls
 └── docs/keeping-uncertainty.md  Why an unclear answer must stay unclear
 ```
 
@@ -245,8 +245,8 @@ The dashboard runs in dry run with no configuration, no credentials, and no `.en
 | --- | --- | --- |
 | `HERDRELAY_MODE` | no | `live` places real calls. **Anything else, including unset, is a dry run.** |
 | `HERDRELAY_DRY_RUN_SCENARIO` | no | Default scripted outcome. Overridable per incident in the UI. |
-| `HERDRELAY_AUTHORIZED_E164` | live only | The one number HerdRelay may dial, exact ASCII E.164. No default. |
-| `HERDRELAY_CARETAKER_NAME` | live only | The person who agreed to receive these calls. Named on the call. |
+| `HERDRELAY_AUTHORIZED_E164` | live only | The one number HerdRelay may dial, exact ASCII E.164. No default. Not used in self-service mode. |
+| `HERDRELAY_CARETAKER_NAME` | live only | The person who agreed to receive these calls. Named on the call. Not used in self-service mode. |
 | `HERDRELAY_SITE_NAME` | no | The farm named in the disclosure. Defaults to `Ridgeline Dairy`. |
 | `CALLE_API_KEY` | live only | CALL-E credential. Server-side only; sent only to `api.heycall-e.com`. |
 | `CALLE_BASE_URL` | no | Compatibility only; only `https://api.heycall-e.com` is accepted. |
@@ -453,7 +453,7 @@ what one person said.
 ## Testing
 
 ```bash
-npm test        # 113 tests
+npm test        # 115 tests
 npm run check   # typecheck + tests
 ```
 
@@ -676,7 +676,7 @@ credential pinned to `https://api.heycall-e.com` and redirects refused. Seven dr
 cover confirmation, escalation, decline, no answer, voicemail, a contradictory provider result and a
 provider failure.
 
-Tests: 113, no credentials and no calls.
+Tests: 115, no credentials and no calls.
 ```
 
 ---

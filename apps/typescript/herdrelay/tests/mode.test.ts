@@ -24,9 +24,36 @@ test("an unrecognised scenario falls back to the safe default", () => {
   assert.equal(dryRunScenario({ HERDRELAY_DRY_RUN_SCENARIO: "declined" } as Env), "declined");
 });
 
+test("self-service needs no configured destination, because the recipient supplies it", () => {
+  // The mode that replaces the configured caretaker must not be blocked by the
+  // absence of one, and signing in is access.ts's job, not this function's.
+  const selfService = {
+    HERDRELAY_MODE: "live",
+    HERDRELAY_SELF_SERVICE: "true",
+    CALLE_API_KEY: "test-key",
+  } as Env;
+  assert.equal(liveReadiness(selfService).ready, true);
+
+  // Still fails closed on the one thing it does need.
+  assert.equal(liveReadiness({ ...selfService, CALLE_API_KEY: "" } as Env).ready, false);
+  assert.equal(liveReadiness({ ...selfService, HERDRELAY_MODE: "dry_run" } as Env).ready, false);
+});
+
+test("a deployment signed in by seed or account is ready without an auth token", () => {
+  // liveReadiness answers "can a call be placed", not "can somebody sign in".
+  const seeded = {
+    HERDRELAY_MODE: "live",
+    HERDRELAY_AUTHORIZED_E164: "+14155552671",
+    HERDRELAY_CARETAKER_NAME: "Sam Okonkwo",
+    CALLE_API_KEY: "test-key",
+    HERDRELAY_OPERATOR_SEED: "judge:Devpost Judge:open-sesame-2026",
+  } as Env;
+  assert.equal(liveReadiness(seeded).ready, true);
+});
+
 test("live readiness fails closed on every missing piece, and names none of the secrets", () => {
   assert.equal(liveReadiness({} as Env).ready, false);
-  for (const missing of ["HERDRELAY_AUTHORIZED_E164", "CALLE_API_KEY", "HERDRELAY_AUTH_TOKEN", "HERDRELAY_CARETAKER_NAME"]) {
+  for (const missing of ["HERDRELAY_AUTHORIZED_E164", "CALLE_API_KEY", "HERDRELAY_CARETAKER_NAME"]) {
     const env = { ...LIVE, [missing]: "" } as Env;
     const readiness = liveReadiness(env);
     assert.equal(readiness.ready, false, `${missing} was not required`);
